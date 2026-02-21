@@ -1,5 +1,6 @@
 import discord
-from discord.ext import commands, tasks
+from discord import app_commands
+from discord.ext import commands
 from collections import defaultdict
 import time
 import os
@@ -21,20 +22,26 @@ def keep_alive():
     t.start()
 
 # ----- Configuration -----
-# IMPORTANT: If you aren't using .env yet, replace os.getenv with "YOUR_TOKEN" 
-# just to test locally. Switch back to os.getenv before pushing to GitHub!
 TOKEN = os.getenv("DISCORD_TOKEN") 
-PREFIX = "!"
 
 intents = discord.Intents.default()
 intents.members = True
 intents.message_content = True
 intents.guilds = True
 
-bot = commands.Bot(command_prefix=PREFIX, intents=intents)
+class MyBot(commands.Bot):
+    def __init__(self):
+        super().__init__(command_prefix="!", intents=intents)
+
+    async def setup_hook(self):
+        # This syncs your slash commands with Discord
+        await self.tree.sync()
+        print("Slash commands synced!")
+
+bot = MyBot()
 
 # ----- Data Storage -----
-user_warns = defaultdict(list) 
+user_warns = defaultdict(list)
 user_last_message = {}
 join_tracker = defaultdict(list)
 
@@ -46,81 +53,61 @@ MUTED_ROLE_NAME = "Muted"
 async def on_ready():
     print(f"Logged in as {bot.user}")
 
-# ----- Moderation Commands -----
+# ----- Slash Moderation Commands -----
 
-@bot.command()
-@commands.has_permissions(kick_members=True)
-async def kick(ctx, member: discord.Member, *, reason="No reason provided"):
+@bot.tree.command(name="kick", description="Kick a member from the server")
+@app_commands.checks.has_permissions(kick_members=True)
+async def kick(interaction: discord.Interaction, member: discord.Member, reason: str = "No reason provided"):
     if not member.kickable:
-        return await ctx.send("I cannot kick this user.")
+        return await interaction.response.send_message("I cannot kick this user.", ephemeral=True)
     await member.kick(reason=reason)
-    await ctx.send(f"{member} has been kicked. Reason: {reason}")
+    await interaction.response.send_message(f"{member} has been kicked. Reason: {reason}")
 
-@bot.command()
-@commands.has_permissions(ban_members=True)
-async def ban(ctx, member: discord.Member, *, reason="No reason provided"):
+@bot.tree.command(name="ban", description="Ban a member from the server")
+@app_commands.checks.has_permissions(ban_members=True)
+async def ban(interaction: discord.Interaction, member: discord.Member, reason: str = "No reason provided"):
     if not member.bannable:
-        return await ctx.send("I cannot ban this user.")
+        return await interaction.response.send_message("I cannot ban this user.", ephemeral=True)
     await member.ban(reason=reason)
-    await ctx.send(f"{member} has been banned. Reason: {reason}")
+    await interaction.response.send_message(f"{member} has been banned. Reason: {reason}")
 
-@bot.command()
-@commands.has_permissions(manage_roles=True)
-async def mute(ctx, member: discord.Member):
-    role = discord.utils.get(ctx.guild.roles, name=MUTED_ROLE_NAME)
+@bot.tree.command(name="mute", description="Mute a member")
+@app_commands.checks.has_permissions(manage_roles=True)
+async def mute(interaction: discord.Interaction, member: discord.Member):
+    role = discord.utils.get(interaction.guild.roles, name=MUTED_ROLE_NAME)
     if role is None:
-        role = await ctx.guild.create_role(name=MUTED_ROLE_NAME)
-        for channel in ctx.guild.channels:
+        role = await interaction.guild.create_role(name=MUTED_ROLE_NAME)
+        for channel in interaction.guild.channels:
             await channel.set_permissions(role, send_messages=False, speak=False)
     await member.add_roles(role)
-    await ctx.send(f"{member} has been muted.")
+    await interaction.response.send_message(f"{member} has been muted.")
 
-@bot.command()
-@commands.has_permissions(manage_roles=True)
-async def unmute(ctx, member: discord.Member):
-    role = discord.utils.get(ctx.guild.roles, name=MUTED_ROLE_NAME)
-    if role and role in member.roles:
-        await member.remove_roles(role)
-        await ctx.send(f"{member} has been unmuted.")
-    else:
-        await ctx.send("This user is not muted.")
-
-@bot.command()
-@commands.has_permissions(kick_members=True)
-async def warn(ctx, member: discord.Member, *, reason="No reason provided"):
+@bot.tree.command(name="warn", description="Give a warning to a member")
+@app_commands.checks.has_permissions(kick_members=True)
+async def warn(interaction: discord.Interaction, member: discord.Member, reason: str = "No reason provided"):
     user_warns[member.id].append(reason)
-    await ctx.send(f"{member} has been warned. Reason: {reason}")
+    await interaction.response.send_message(f"{member} has been warned. Reason: {reason}")
 
-@bot.command(name="warnings")
-async def check_warnings(ctx, member: discord.Member):
+@bot.tree.command(name="warnings", description="Check a member's warnings")
+async def check_warnings(interaction: discord.Interaction, member: discord.Member):
     warns = user_warns.get(member.id, [])
     if warns:
         formatted = "\n".join(warns)
-        await ctx.send(f"{member} has {len(warns)} warning(s):\n{formatted}")
+        await interaction.response.send_message(f"{member} has {len(warns)} warning(s):\n{formatted}")
     else:
-        await ctx.send("No warnings.")
+        await interaction.response.send_message("No warnings.", ephemeral=True)
 
-@bot.command()
-@commands.has_permissions(manage_messages=True)
-async def purge(ctx, amount: int):
+@bot.tree.command(name="purge", description="Delete a certain amount of messages")
+@app_commands.checks.has_permissions(manage_messages=True)
+async def purge(interaction: discord.Interaction, amount: int):
     if amount < 1 or amount > 100:
-        return await ctx.send("Please provide a number between 1 and 100.")
-    await ctx.channel.purge(limit=amount + 1)
-    await ctx.send(f"Deleted {amount} messages.", delete_after=5)
+        return await interaction.response.send_message("Please provide a number between 1 and 100.", ephemeral=True)
+    
+    await interaction.response.defer(ephemeral=True) # Tells Discord the bot is working
+    deleted = await interaction.channel.purge(limit=amount)
+    await interaction.followup.send(f"Deleted {len(deleted)} messages.")
 
-@bot.command()
-@commands.has_permissions(manage_channels=True)
-async def lock(ctx):
-    await ctx.channel.set_permissions(ctx.guild.default_role, send_messages=False)
-    await ctx.send("Channel locked.")
-
-@bot.command()
-@commands.has_permissions(manage_channels=True)
-async def unlock(ctx):
-    await ctx.channel.set_permissions(ctx.guild.default_role, send_messages=True)
-    await ctx.send("Channel unlocked.")
-
-# ----- Events -----
+# ----- Events (Anti-Spam & Anti-Raid) -----
 
 @bot.event
 async def on_message(message):
@@ -132,7 +119,6 @@ async def on_message(message):
     if now - last < 3:
         try:
             await message.delete()
-            await message.channel.send(f"{message.author.mention}, slow down!", delete_after=3)
         except:
             pass
         return
@@ -157,4 +143,4 @@ if __name__ == "__main__":
     if TOKEN:
         bot.run(TOKEN)
     else:
-        print("Error: No TOKEN found. Check your Environment Variables.")
+        print("Error: No TOKEN found.")
