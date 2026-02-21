@@ -6,6 +6,7 @@ import time
 import os
 from threading import Thread
 from flask import Flask
+import datetime
 
 # ----- Render Keep-Alive Server -----
 app = Flask('')
@@ -71,16 +72,27 @@ async def ban(interaction: discord.Interaction, member: discord.Member, reason: 
     await member.ban(reason=reason)
     await interaction.response.send_message(f"{member} has been banned. Reason: {reason}")
 
-@bot.tree.command(name="mute", description="Mute a member")
-@app_commands.checks.has_permissions(manage_roles=True)
-async def mute(interaction: discord.Interaction, member: discord.Member):
-    role = discord.utils.get(interaction.guild.roles, name=MUTED_ROLE_NAME)
-    if role is None:
-        role = await interaction.guild.create_role(name=MUTED_ROLE_NAME)
-        for channel in interaction.guild.channels:
-            await channel.set_permissions(role, send_messages=False, speak=False)
-    await member.add_roles(role)
-    await interaction.response.send_message(f"{member} has been muted.")
+@bot.tree.command(name="mute", description="Timeout a user and ban them from voice for a set time")
+@app_commands.checks.has_permissions(moderate_members=True)
+@app_commands.describe(minutes="How many minutes should the user be timed out?")
+async def mute(interaction: discord.Interaction, member: discord.Member, minutes: int, reason: str = "No reason provided"):
+    # Check if the user is trying to mute an admin/themselves
+    if member.top_role >= interaction.user.top_role:
+        return await interaction.response.send_message("You cannot mute someone with a higher or equal role!", ephemeral=True)
+
+    # Convert minutes to a duration
+    duration = datetime.timedelta(minutes=minutes)
+    
+    try:
+        # This one command handles text, voice, and reactions
+        await member.timeout(duration, reason=reason)
+        
+        await interaction.response.send_message(
+            f"✅ **{member.display_name}** has been timed out for **{minutes} minutes**.\n"
+            f"**Reason:** {reason}"
+        )
+    except Exception as e:
+        await interaction.response.send_message(f"Failed to timeout user: {e}", ephemeral=True)
 
 @bot.tree.command(name="warn", description="Give a warning to a member")
 @app_commands.checks.has_permissions(kick_members=True)
@@ -106,6 +118,19 @@ async def purge(interaction: discord.Interaction, amount: int):
     await interaction.response.defer(ephemeral=True) # Tells Discord the bot is working
     deleted = await interaction.channel.purge(limit=amount)
     await interaction.followup.send(f"Deleted {len(deleted)} messages.")
+
+@bot.tree.command(name="mute", description="Timeout a user (Text & Voice)")
+@app_commands.checks.has_permissions(moderate_members=True)
+async def unmute(interaction: discord.Interaction, member: discord.Member, reason: str = "No reason provided"):
+    if not member.is_timed_out():
+        return await interaction.response.send_message("This user is not currently timed out.", ephemeral=True)
+
+    try:
+        # Setting timeout to None removes the restriction immediately
+        await member.timeout(None, reason=reason)
+        await interaction.response.send_message(f"✅ Removed timeout for **{member.display_name}**.")
+    except Exception as e:
+        await interaction.response.send_message(f"Failed to remove timeout: {e}", ephemeral=True)
 
 # ----- Events (Anti-Spam & Anti-Raid) -----
 
