@@ -4,6 +4,7 @@ from discord.ext import commands
 import datetime 
 import os
 import time
+import asyncio
 from collections import defaultdict
 from threading import Thread
 from flask import Flask
@@ -20,12 +21,30 @@ def run():
 def keep_alive(): 
     Thread(target=run).start()
 
-# ----- Bot Setup -----
-TOKEN = os.getenv("DISCORD_TOKEN") 
+# ----- Configuration -----
+TOKEN = os.getenv("DISCORD_TOKEN")
+WEBHOOK_URL = os.getenv("WEBHOOK_URL") 
+SWEAR_WORDS = ["badword1", "badword2"] # Add your filtered words here
+MUTED_ROLE_NAME = "Muted"
+
+# Raid Detection Settings
+MESSAGE_LIMIT = 5      
+TIME_WINDOW = 5        
+MUTE_DURATION = 60     
+
 intents = discord.Intents.default()
 intents.members = True 
 intents.message_content = True 
-intents.guilds = True 
+intents.guilds = True
+
+# Data Tracking
+user_message_logs = defaultdict(list)
+log_config = {
+    "messageDelete": True,
+    "messageEdit": True,
+    "guildMemberAdd": True,
+    "guildMemberRemove": True
+}
 
 class MyBot(commands.Bot):
     def __init__(self):
@@ -37,76 +56,85 @@ class MyBot(commands.Bot):
 bot = MyBot()
 
 # ----- Logging Helper -----
-async def log_action(guild, message):
-    channel = discord.utils.get(guild.text_channels, name="mod-logs")
-    if channel:
-        embed = discord.Embed(
-            title="Moderation Log", 
-            description=message, 
-            color=discord.Color.orange(), 
-            timestamp=datetime.datetime.now()
-        )
-        await channel.send(embed=embed)
+def send_audit_log(embed):
+    if WEBHOOK_URL:
+        try:
+            webhook = discord.SyncWebhook.from_url(WEBHOOK_URL)
+            webhook.send(embed=embed)
+        except Exception as e:
+            print(f"Webhook error: {e}")
 
-# ----- Lock & Lockdown Commands -----
+# ----- Events (Anti-Swear, Anti-Raid, & Logs) -----
+
+@bot.event
+async def on_message(message):
+    if message.author.bot: 
+        return
+
+    # 1. Swear Word Filter
+    if any(word.lower() in message.content.lower() for word in SWEAR_WORDS):
+        await message.delete()
+        await message.channel.send(f"{message.author.mention}, watch your language!", delete_after=5)
+        return
+
+    # 2. Anti-Raid / Auto-Mute Logic
+    now = datetime.datetime.utcnow()
+    user_message_logs[message.author.id].append(now)
+    user_message_logs[message.author.id] = [t for t in user_message_logs[message.author.id] if (now - t).total_seconds() < TIME_WINDOW]
+
+    if len(user_message_logs[message.author.id]) >= MESSAGE_LIMIT:
+        muted_role = discord.utils.get(message.guild.roles, name=MUTED_ROLE_NAME)
+        if muted_role:
+            await message.author.add_roles(muted_role)
+            await message.channel.send(f"🔇 {message.author.mention} has been auto-muted for spamming.")
+            user_message_logs[message.author.id].clear()
+            
+            await asyncio.sleep(MUTE_DURATION)
+            await message.author.remove_roles(muted_role)
+            await message.channel.send(f"✅ {message.author.mention} has been unmuted.")
+        return
+
+    await bot.process_commands(message)
+
+@bot.event
+async def on_message_delete(message):
+    if not log_config["messageDelete"] or message.author.bot: 
+        return
+    embed = discord.Embed(title="🗑️ Message Deleted", description=f"By **{message.author}** in {message.channel.mention}", color=discord.Color.red())
+    embed.add_field(name="Content", value=message.content or "No content")
+    embed.timestamp = discord.utils.utcnow()
+    send_audit_log(embed)
+
+@bot.event
+async def on_message_edit(before, after):
+    if not log_config["messageEdit"] or before.author.bot or before.content == after.content: 
+        return
+    embed = discord.Embed(title="✏️ Message Edited", description=f"By **{before.author}** in {before.channel.mention}", color=discord.Color.orange())
+    embed.add_field(name="Before", value=before.content or "No content", inline=False)
+    embed.add_field(name="After", value=after.content or "No content", inline=False)
+    send_audit_log(embed)
+
+@bot.event
+async def on_member_join(member):
+    if not log_config["guildMemberAdd"]: 
+        return
+    embed = discord.Embed(title="👋 Member Joined", description=f"{member.mention} joined the server.", color=discord.Color.green())
+    embed.set_thumbnail(url=member.display_avatar.url)
+    embed.timestamp = discord.utils.utcnow()
+    send_audit_log(embed)
+
+# ----- Slash Commands -----
 
 @bot.tree.command(name="lock", description="Toggle lock/unlock on the current channel")
-@app_commands.checks.has_permissions(administrator=True)
+@app_commands.checks.has_permissions(manage_channels=True)
 async def lock(interaction: discord.Interaction):
     channel = interaction.channel
     overwrite = channel.overwrites_for(interaction.guild.default_role)
-    
-    if overwrite.send_messages is False:
-        overwrite.send_messages = True
-        await channel.set_permissions(interaction.guild.default_role, overwrite=overwrite)
-        await interaction.response.send_message(f"🔓 {channel.mention} has been unlocked!")
-    else:
-        overwrite.send_messages = False
-        await channel.set_permissions(interaction.guild.default_role, overwrite=overwrite)
-        await interaction.response.send_message(f"🔒 {channel.mention} has been locked!")
-
-@bot.tree.command(name="lockdown", description="Lock or unlock ALL text channels in the server")
-@app_commands.checks.has_permissions(administrator=True)
-@app_commands.describe(action="Choose to lock or unlock the whole server")
-@app_commands.choices(action=[
-    app_commands.Choice(name="Lock Server", value="lock"),
-    app_commands.Choice(name="Unlock Server", value="unlock")
-])
-async def lockdown(interaction: discord.Interaction, action: str):
-    await interaction.response.defer(ephemeral=True)
-    guild = interaction.guild
-    
-    for channel in guild.text_channels:
-        overwrite = channel.overwrites_for(guild.default_role)
-        overwrite.send_messages = (action == "unlock")
-        await channel.set_permissions(guild.default_role, overwrite=overwrite)
-    
-    status = "🔒 Server is now in lockdown mode!" if action == "lock" else "🔓 Server lockdown lifted!"
-    await interaction.followup.send(status)
-    await log_action(guild, f"**Server-wide {action}** executed by {interaction.user.mention}")
-
-# ----- Moderation Commands -----
-
-@bot.tree.command(name="mute", description="Timeout a user (Text & Voice)")
-@app_commands.checks.has_permissions(moderate_members=True)
-async def mute(interaction: discord.Interaction, member: discord.Member, minutes: int, reason: str = "No reason provided"):
-    if member.top_role >= interaction.user.top_role:
-        return await interaction.response.send_message("You cannot mute someone with a higher/equal role!", ephemeral=True)
-
-    duration = datetime.timedelta(minutes=minutes)
-    await member.timeout(duration, reason=reason)
-    
-    log_msg = f"🔇 **{member.display_name}** muted for **{minutes}m**.\n**Reason:** {reason}\n**By:** {interaction.user.mention}"
-    await interaction.response.send_message(f"Timed out {member.mention} for {minutes} minutes.")
-    await log_action(interaction.guild, log_msg)
-
-@bot.tree.command(name="unmute", description="Remove timeout/voice ban")
-@app_commands.checks.has_permissions(moderate_members=True)
-async def unmute(interaction: discord.Interaction, member: discord.Member):
-    await member.timeout(None)
-    log_msg = f"🔊 **{member.display_name}** has been unmuted by {interaction.user.mention}."
-    await interaction.response.send_message(f"Removed timeout for {member.mention}.")
-    await log_action(interaction.guild, log_msg)
+    lock_status = not (overwrite.send_messages is False)
+    overwrite.send_messages = not lock_status
+    await channel.set_permissions(interaction.guild.default_role, overwrite=overwrite)
+    action = "locked" if lock_status else "unlocked"
+    await interaction.response.send_message(f"Channel has been {action}.")
 
 @bot.tree.command(name="purge", description="Delete messages")
 @app_commands.checks.has_permissions(manage_messages=True)
@@ -115,11 +143,9 @@ async def purge(interaction: discord.Interaction, amount: int):
     deleted = await interaction.channel.purge(limit=amount)
     await interaction.followup.send(f"Deleted {len(deleted)} messages.")
 
-# ----- Events -----
-
 @bot.event
 async def on_ready():
-    print(f"Logged in as {bot.user}")
+    print(f"✅ Logged in as {bot.user}")
 
 if __name__ == "__main__":
     keep_alive()
