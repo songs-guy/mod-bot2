@@ -60,6 +60,7 @@ def home():
                             <option value="ban">🔨 Ban User</option>
                             <option value="warn">⚠️ Warn User</option>
                             <option value="purge">🧹 Purge Channel</option>
+                            <option value="dm">📧 DM User (User ID)</option>
                         </select>
                         
                         <textarea name="payload" placeholder="Message, Reason, or Image URL..." style="padding: 10px; height: 60px; border-radius: 5px; border: none;"></textarea>
@@ -87,7 +88,6 @@ def execute():
     payload = request.form.get('payload')
     actual_pwd = os.getenv("DASHBOARD_PWD", "admin")
 
-    # Use the dropdown member ID if manual ID is empty
     final_target = target_id if target_id else member_target
 
     if typed_pwd != actual_pwd:
@@ -100,13 +100,22 @@ def execute():
             bot.loop.create_task(channel.send(payload))
             return f"✅ Message sent. <a href='/'>Back</a>"
 
-        # Action: Send Image URL
+        # Action: Send Image URL (Enhanced with fallback)
         if action == "image":
             channel = bot.get_channel(int(final_target))
+            # Try sending as an Embed first
             embed = discord.Embed()
             embed.set_image(url=payload)
-            bot.loop.create_task(channel.send(embed=embed))
-            return f"✅ Image sent as Embed. <a href='/'>Back</a>"
+            bot.loop.create_task(channel.send(payload, embed=embed)) # Sends URL + Embed for max compatibility
+            return f"✅ Image Command Executed. <a href='/'>Back</a>"
+
+        # Action: DM User
+        if action == "dm":
+            for guild in bot.guilds:
+                member = guild.get_member(int(final_target))
+                if member:
+                    bot.loop.create_task(member.send(payload))
+                    return f"✅ DM sent to {member.name}. <a href='/'>Back</a>"
 
         # Action: Kick
         if action == "kick":
