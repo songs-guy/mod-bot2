@@ -170,6 +170,17 @@ async def on_message(message):
 
 # ----- Moderation Slash Commands -----
 
+@bot.tree.command(name="purge", description="Delete a specified number of messages")
+@app_commands.checks.has_permissions(manage_messages=True)
+async def purge(interaction: discord.Interaction, amount: int):
+    if amount < 1 or amount > 100:
+        return await interaction.response.send_message("❌ Please choose a number between 1 and 100.", ephemeral=True)
+    
+    await interaction.response.defer(ephemeral=True)
+    deleted = await interaction.channel.purge(limit=amount)
+    await interaction.followup.send(f"🧹 Successfully deleted {len(deleted)} messages.")
+    send_to_webhook("🧹 Purge Executed", f"Moderator: {interaction.user.mention}\nAmount: {len(deleted)}\nChannel: {interaction.channel.mention}", discord.Color.blue())
+
 @bot.tree.command(name="warn", description="Issue a permanent warning")
 @app_commands.checks.has_permissions(manage_messages=True)
 async def warn(interaction: discord.Interaction, member: discord.Member, reason: str):
@@ -228,6 +239,12 @@ async def kick(interaction: discord.Interaction, member: discord.Member, reason:
 async def ban(interaction: discord.Interaction, member: discord.Member, reason: str = "No reason provided"):
     await member.ban(reason=reason)
     await interaction.response.send_message(f"🔨 Banned {member.display_name}")
+
+@bot.tree.command(name="slowmode", description="Set channel slowmode")
+@app_commands.checks.has_permissions(manage_channels=True)
+async def slowmode(interaction: discord.Interaction, seconds: int):
+    await interaction.channel.edit(slowmode_delay=seconds)
+    await interaction.response.send_message(f"⏲️ Slowmode set to {seconds} seconds.")
 
 @bot.tree.command(name="setup_verify", description="Deploy the verification portal")
 @app_commands.checks.has_permissions(administrator=True)
