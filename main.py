@@ -111,6 +111,12 @@ def home():
                 }}
                 button:hover {{ background: #4752c4; }}
                 button:active {{ transform: scale(0.98); }}
+                .clear-btn {{
+                    background: #ed4245;
+                    padding: 10px;
+                    font-size: 0.8em;
+                    margin-top: 10px;
+                }}
                 .embed-section {{ 
                     background: #2f3136;
                     border-radius: 8px;
@@ -132,6 +138,7 @@ def home():
                 h2 {{ font-size: 2.2em; margin-bottom: 40px; font-weight: 800; letter-spacing: -1px; }}
                 h3 {{ font-size: 1.5em; margin-bottom: 25px; color: #5865F2; }}
                 .icon {{ font-style: normal; font-size: 1.2em; }}
+                .hidden {{ display: none !important; }}
             </style>
             <script>
                 function updateCounter() {{
@@ -145,6 +152,42 @@ def home():
                         counter.style.color = '#b9bbbe';
                     }}
                 }}
+
+                function toggleInputs() {{
+                    const action = document.getElementById('action_select').value;
+                    const channelGroup = document.getElementById('group_channel');
+                    const memberGroup = document.getElementById('group_member');
+                    const embedGroup = document.getElementById('group_embed');
+                    const payloadLabel = document.getElementById('label_payload');
+                    
+                    // Reset visibility
+                    channelGroup.classList.add('hidden');
+                    memberGroup.classList.add('hidden');
+                    embedGroup.classList.add('hidden');
+
+                    if (["say", "embed", "image", "purge"].includes(action)) {{
+                        channelGroup.classList.remove('hidden');
+                    }}
+                    
+                    if (["dm", "kick", "ban", "warn"].includes(action)) {{
+                        memberGroup.classList.remove('hidden');
+                    }}
+
+                    if (action === "embed") {{
+                        embedGroup.classList.remove('hidden');
+                    }}
+
+                    // Contextual labeling for payload
+                    if (action === "purge") {{
+                        payloadLabel.innerText = "Number of Messages to Clear";
+                    }} else if (action === "kick" || action === "ban" || action === "warn") {{
+                        payloadLabel.innerText = "Reason for Action";
+                    }} else {{
+                        payloadLabel.innerText = "Message Content Body";
+                    }}
+                }}
+
+                window.onload = toggleInputs;
             </script>
         </head>
         <body>
@@ -154,20 +197,8 @@ def home():
                     <label><i class="icon">🔒</i> Access Token</label>
                     <input type="password" name="pwd" placeholder="Enter Dashboard Password">
                     
-                    <label><i class="icon">💬</i> Target Channel</label>
-                    <select name="channel_preset">
-                        <option value="">Select a channel...</option>
-                        {channels_string}
-                    </select>
-
-                    <label><i class="icon">👤</i> Target Member</label>
-                    <select name="member_target">
-                        <option value="">Select a member...</option>
-                        {members_string}
-                    </select>
-                    
                     <label><i class="icon">🛠️</i> System Operation</label>
-                    <select name="action" style="border-left: 4px solid #5865F2;">
+                    <select id="action_select" name="action" onchange="toggleInputs()" style="border-left: 4px solid #5865F2;">
                         <option value="say">Send Plain Message</option>
                         <option value="embed">Send Rich Embed</option>
                         <option value="image">Post Image Link</option>
@@ -177,20 +208,38 @@ def home():
                         <option value="warn">Warn Member</option>
                         <option value="purge">Purge Messages</option>
                     </select>
+
+                    <div id="group_channel">
+                        <label><i class="icon">💬</i> Target Channel</label>
+                        <select name="channel_preset">
+                            <option value="">Select a channel...</option>
+                            {channels_string}
+                        </select>
+                    </div>
+
+                    <div id="group_member">
+                        <label><i class="icon">👤</i> Target Member</label>
+                        <select name="member_target">
+                            <option value="">Select a member...</option>
+                            {members_string}
+                        </select>
+                    </div>
                     
-                    <div class="embed-section">
+                    <div id="group_embed" class="hidden">
                         <label><i class="icon">📑</i> Content Title</label>
                         <input type="text" name="eb_title" placeholder="Optional title...">
                         
                         <label><i class="icon">🎨</i> Embed Color (HEX)</label>
                         <input type="text" name="eb_color" placeholder="#5865F2">
-                        
-                        <label><i class="icon">📝</i> Message Body</label>
-                        <textarea id="payload_area" name="payload" placeholder="Type your message content here..." oninput="updateCounter()"></textarea>
-                        <div class="char-counter" id="char_count">0 / 2000</div>
-                        
+
                         <label><i class="icon">🔗</i> Image / Thumbnail URL</label>
                         <input type="text" name="eb_image" placeholder="https://">
+                    </div>
+
+                    <div id="payload_section">
+                        <label id="label_payload"><i class="icon">📝</i> Message Body</label>
+                        <textarea id="payload_area" name="payload" placeholder="Type data here..." oninput="updateCounter()"></textarea>
+                        <div class="char-counter" id="char_count">0 / 2000</div>
                     </div>
 
                     <button type="submit">EXECUTE OPERATION</button>
@@ -199,13 +248,21 @@ def home():
 
             <div class="log-card">
                 <h3 style="margin-top: 0; position: sticky; top: 0; background: #18191c; padding: 15px 0;">ACTIVITY LOG</h3>
-                <ul style="list-style: none; padding: 0; font-size: 1.1em;">
+                <form action="/clear_logs" method="post">
+                    <button type="submit" class="clear-btn">Clear Activity Stream</button>
+                </form>
+                <ul style="list-style: none; padding: 0; font-size: 1.1em; margin-top: 20px;">
                     {log_html if log_html else "<li style='color: #4f545c;'>System ready. No recent activity.</li>"}
                 </ul>
             </div>
         </body>
     </html>
     '''
+
+@app.route('/clear_logs', methods=['POST'])
+def clear_logs():
+    recent_logs.clear()
+    return "✅ Logs cleared. <a href='/'>Back</a>"
 
 @app.route('/execute', methods=['POST'])
 def execute():
