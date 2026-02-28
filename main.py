@@ -26,7 +26,7 @@ recent_logs = []
 @app.route('/')
 def home():
     # Creating the HTML Dashboard - Clean, ID-free, with Embed Presets
-    log_html = "".join([f"<li style='margin-bottom:5px;'><b>{l['user']}:</b> {l['content']} <small style='color:gray;'>({l['time']})</small></li>" for l in recent_logs])
+    log_html = "".join([f"<li style='margin-bottom:12px; border-bottom: 1px solid #4f545c; padding-bottom: 8px;'><b>{l['user']}:</b> {l['content']} <br><small style='color:gray;'>🕒 {l['time']}</small></li>" for l in recent_logs])
     
     # Generate Member Presets
     members_string = "".join([f"<option value='{m.id}'>{m.name}</option>" for g in bot.guilds for m in g.members if not m.bot])
@@ -37,86 +37,119 @@ def home():
     return f'''
     <html>
         <head>
-            <title>Bot Master Console</title>
+            <title>Bot Master Console Pro</title>
             <style>
                 body {{ 
                     background-color: #23272a; 
                     color: white; 
-                    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+                    font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
                     display: flex; 
                     flex-direction: row; 
                     justify-content: center; 
-                    gap: 30px; 
-                    padding: 40px; 
-                    max-width: 1600px; 
-                    margin: 0 auto; 
+                    align-items: flex-start;
+                    gap: 50px; 
+                    padding: 80px; 
+                    margin: 0;
                 }}
                 .card {{ 
                     background: #2c2f33; 
-                    padding: 35px; 
-                    border-radius: 15px; 
-                    border: 1px solid #7289da; 
-                    width: 700px;  /* Increased from 550px */
+                    padding: 55px; 
+                    border-radius: 25px; 
+                    border: 2px solid #7289da; 
+                    width: 900px; 
+                    box-shadow: 0 15px 40px rgba(0,0,0,0.6);
                 }}
                 .log-card {{ 
                     background: #2c2f33; 
-                    padding: 30px; 
-                    border-radius: 15px; 
-                    border: 1px solid #43b581; 
-                    width: 500px;  /* Increased from 400px */
-                    height: 900px; /* Increased from 800px */
+                    padding: 40px; 
+                    border-radius: 25px; 
+                    border: 2px solid #43b581; 
+                    width: 600px;  
+                    height: 1100px; 
                     overflow-y: auto; 
                 }}
                 input, select, textarea {{ 
                     width: 100%; 
-                    padding: 15px; 
-                    margin-top: 8px; 
-                    border-radius: 8px; 
-                    border: none; 
-                    background: #4f545c; 
+                    padding: 22px; 
+                    margin-top: 15px; 
+                    border-radius: 12px; 
+                    border: 2px solid #4f545c; 
+                    background: #40444b; 
                     color: white; 
                     box-sizing: border-box; 
-                    font-size: 1em;
+                    font-size: 1.15em;
+                    transition: all 0.3s;
                 }}
-                label {{ font-size: 0.9em; color: #b9bbbe; font-weight: bold; margin-top: 15px; display: block; }}
+                input:focus, select:focus, textarea:focus {{
+                    border-color: #7289da;
+                    background: #4f545c;
+                    outline: none;
+                    box-shadow: 0 0 10px rgba(114, 137, 218, 0.2);
+                }}
+                label {{ 
+                    font-size: 1.1em; 
+                    color: #7289da; 
+                    font-weight: bold; 
+                    margin-top: 35px; 
+                    display: flex; 
+                    align-items: center;
+                    gap: 10px;
+                    text-transform: uppercase;
+                    letter-spacing: 1.5px;
+                }}
                 button {{ 
                     background: #43b581; 
                     color: white; 
                     border: none; 
-                    padding: 20px; 
-                    border-radius: 8px; 
+                    padding: 30px; 
+                    border-radius: 15px; 
                     cursor: pointer; 
-                    font-weight: bold; 
+                    font-weight: 900; 
                     width: 100%; 
-                    margin-top: 25px; 
-                    font-size: 1.2em; 
+                    margin-top: 50px; 
+                    font-size: 1.6em; 
+                    text-transform: uppercase;
+                    box-shadow: 0 6px 20px rgba(67, 181, 129, 0.4);
+                    transition: all 0.2s;
                 }}
-                button:hover {{ background: #3ca374; }}
-                .embed-section {{ border-top: 1px solid #4f545c; margin-top: 25px; padding-top: 20px; }}
-                textarea {{ height: 150px; resize: vertical; }} /* Made text area taller */
+                button:hover {{ background: #3ca374; transform: translateY(-3px); box-shadow: 0 8px 25px rgba(67, 181, 129, 0.5); }}
+                button:active {{ transform: translateY(1px); }}
+                .embed-section {{ 
+                    border-top: 3px solid #4f545c; 
+                    margin-top: 45px; 
+                    padding-top: 40px; 
+                }}
+                textarea {{ 
+                    min-height: 300px; 
+                    resize: vertical; 
+                    line-height: 1.6;
+                }}
+                h2 {{ font-size: 3em; margin-bottom: 40px; color: white; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); }}
+                h3 {{ font-size: 2.2em; margin-bottom: 25px; }}
+                .icon {{ font-style: normal; font-size: 1.3em; }}
             </style>
         </head>
         <body>
             <div class="card">
-                <h2 style="text-align:center; margin-top:0; font-size: 2em;">🤖 Bot Command Center</h2>
+                <h2 style="text-align:center; margin-top:0;">🌐 Bot Command Pro</h2>
                 <form action="/execute" method="post">
-                    <label>DASHBOARD PASSWORD</label>
-                    <input type="password" name="pwd" placeholder="Enter Password">
+                    <label><i class="icon">🔑</i> Dashboard Password</label>
+                    <input type="password" name="pwd" placeholder="Enter secure admin password...">
                     
-                    <label>TARGET CHANNEL (For Messages/Embeds)</label>
+                    <label><i class="icon">📺</i> Target Channel</label>
                     <select name="channel_preset">
-                        <option value="">-- Select Channel --</option>
+                        <option value="">-- Click to Select Channel --</option>
                         {channels_string}
                     </select>
 
-                    <label>TARGET MEMBER (For Mod Actions/DMs)</label>
+                    <label><i class="icon">👤</i> Target Member</label>
                     <select name="member_target">
-                        <option value="">-- Select Member --</option>
+                        <option value="">-- Click to Select Member --</option>
                         {members_string}
                     </select>
                     
-                    <label>ACTION</label>
-                    <select name="action" style="background: #7289da; font-weight: bold;">
+                    <label><i class="icon">⚡</i> System Action</label>
+                    <select name="action" style="background: #7289da; font-weight: bold; border-color: #7289da;">
                         <option value="say">💬 Plain Text Message</option>
                         <option value="embed">🎨 Custom Rich Embed</option>
                         <option value="image">🖼️ Quick Image Post</option>
@@ -128,27 +161,29 @@ def home():
                     </select>
                     
                     <div class="embed-section">
-                        <label>EMBED TITLE / HEADER</label>
-                        <input type="text" name="eb_title" placeholder="e.g. Server Announcement">
+                        <h4 style="color: #b9bbbe; margin: 0 0 20px 0; text-transform: uppercase;">Embed Configuration</h4>
                         
-                        <label>EMBED ACCENT COLOR (HEX)</label>
+                        <label><i class="icon">📌</i> Embed Title</label>
+                        <input type="text" name="eb_title" placeholder="Announcement Header...">
+                        
+                        <label><i class="icon">🌈</i> Accent Color (HEX)</label>
                         <input type="text" name="eb_color" placeholder="#7289da">
                         
-                        <label>MAIN CONTENT / DESCRIPTION</label>
-                        <textarea name="payload" placeholder="Type your message or embed description here..."></textarea>
+                        <label><i class="icon">📝</i> Content Body</label>
+                        <textarea name="payload" placeholder="Type your full message or detailed embed description here..."></textarea>
                         
-                        <label>IMAGE URL (Embed Bottom)</label>
-                        <input type="text" name="eb_image" placeholder="https://link-to-image.png">
+                        <label><i class="icon">🖼️</i> Image URL</label>
+                        <input type="text" name="eb_image" placeholder="https://example.com/image.png">
                     </div>
 
-                    <button type="submit">EXECUTE ACTION</button>
+                    <button type="submit">🚀 Execute Bot Command</button>
                 </form>
             </div>
 
             <div class="log-card">
-                <h3 style="color: #43b581; margin-top: 0; position: sticky; top: 0; background: #2c2f33; padding: 10px 0; font-size: 1.5em;">📡 Live Server Feed</h3>
-                <ul style="list-style: none; padding: 0; font-size: 1em;">
-                    {log_html if log_html else "<li>Waiting for activity...</li>"}
+                <h3 style="color: #43b581; margin-top: 0; position: sticky; top: 0; background: #2c2f33; padding: 20px 0; z-index: 10;">📡 Live Activity Stream</h3>
+                <ul style="list-style: none; padding: 0; font-size: 1.2em;">
+                    {log_html if log_html else "<li style='color: #72767d;'>System idle. Waiting for logs...</li>"}
                 </ul>
             </div>
         </body>
@@ -234,7 +269,7 @@ WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 SUPA_URL = os.getenv("SUPABASE_URL")
 SUPA_KEY = os.getenv("SUPABASE_KEY")
 
-# --- Swear Filter List is Here ---
+# --- Swear Filter List ---
 SWEAR_WORDS = ["badword1", "badword2", "badword3"] 
 MUTED_ROLE_NAME = "Muted"
 VERIFIED_ROLE_NAME = "Member"
@@ -350,7 +385,7 @@ async def on_message(message):
     recent_logs.insert(0, {"user": message.author.name, "content": message.content[:50], "time": timestamp})
     if len(recent_logs) > 15: recent_logs.pop()
 
-    # --- Swear Filter Execution is Here ---
+    # --- Swear Filter Execution ---
     if any(word.lower() in message.content.lower() for word in SWEAR_WORDS):
         await message.delete()
         send_to_webhook("🚫 Filtered", f"User: {message.author.mention}\nMsg: {message.content}", discord.Color.red(), message.author)
@@ -380,15 +415,15 @@ async def purge(interaction: discord.Interaction, amount: int):
     await interaction.response.defer(ephemeral=True)
     try:
         deleted = await interaction.channel.purge(limit=amount)
-        await interaction.followup.send(f"🧹 Successfully deleted {len(deleted)} messages.")
-        send_to_webhook("🧹 Purge Executed", f"Moderator: {interaction.user.mention}\nAmount: {len(deleted)}\nChannel: {interaction.channel.mention}", discord.Color.blue())
+        await interaction.followup.send(f"Successfully deleted {len(deleted)} messages.")
+        send_to_webhook("Purge Executed", f"Moderator: {interaction.user.mention}\nAmount: {len(deleted)}\nChannel: {interaction.channel.mention}", discord.Color.blue())
     except Exception as e:
-        await interaction.followup.send(f"❌ Error: {e}")
+        await interaction.followup.send(f"Error: {e}")
 
 @bot.tree.command(name="warn", description="Issue a permanent warning")
 @app_commands.checks.has_permissions(manage_messages=True)
 async def warn(interaction: discord.Interaction, member: discord.Member, reason: str):
-    if not supabase: return await interaction.response.send_message("❌ DB not connected.", ephemeral=True)
+    if not supabase: return await interaction.response.send_message("DB not connected.", ephemeral=True)
     
     data = {
         "guild_id": str(interaction.guild.id),
@@ -400,44 +435,44 @@ async def warn(interaction: discord.Interaction, member: discord.Member, reason:
     
     try:
         supabase.table("warnings").insert(data).execute()
-        await interaction.response.send_message(f"⚠️ **{member.display_name}** warned for: `{reason}`")
-        send_to_webhook("⚠️ Warned", f"User: {member.mention}\nMod: {interaction.user.mention}\nReason: {reason}", discord.Color.gold(), member)
+        await interaction.response.send_message(f"Warned **{member.display_name}** for: `{reason}`")
+        send_to_webhook("Warned", f"User: {member.mention}\nMod: {interaction.user.mention}\nReason: {reason}", discord.Color.gold(), member)
     except Exception as e:
-        await interaction.response.send_message(f"❌ DB Error: {e}", ephemeral=True)
+        await interaction.response.send_message(f"DB Error: {e}", ephemeral=True)
 
 @bot.tree.command(name="warnings", description="View a member's warning history")
 async def warnings(interaction: discord.Interaction, member: discord.Member):
-    if not supabase: return await interaction.response.send_message("❌ DB error.", ephemeral=True)
+    if not supabase: return await interaction.response.send_message("DB error.", ephemeral=True)
     try:
         response = supabase.table("warnings").select("*").eq("user_id", str(member.id)).execute()
         user_warns = response.data
         if not user_warns:
-            return await interaction.response.send_message(f"✅ {member.display_name} has a clean record.")
+            return await interaction.response.send_message(f"{member.display_name} has a clean record.")
         embed = discord.Embed(title=f"Record: {member.display_name}", color=discord.Color.orange())
         for w in user_warns:
             date = w['created_at'].split("T")[0]
             embed.add_field(name=f"Date: {date}", value=f"Reason: {w['reason']}\nBy: {w['moderator']}", inline=False)
         await interaction.response.send_message(embed=embed)
     except Exception as e:
-        await interaction.response.send_message(f"❌ Error: {e}")
+        await interaction.response.send_message(f"Error: {e}")
 
 @bot.tree.command(name="kick", description="Kick a member")
 @app_commands.checks.has_permissions(kick_members=True)
 async def kick(interaction: discord.Interaction, member: discord.Member, reason: str = "No reason provided"):
     await member.kick(reason=reason)
-    await interaction.response.send_message(f"✅ Kicked {member.display_name}")
+    await interaction.response.send_message(f"Kicked {member.display_name}")
 
 @bot.tree.command(name="ban", description="Ban a member")
 @app_commands.checks.has_permissions(ban_members=True)
 async def ban(interaction: discord.Interaction, member: discord.Member, reason: str = "No reason provided"):
     await member.ban(reason=reason)
-    await interaction.response.send_message(f"🔨 Banned {member.display_name}")
+    await interaction.response.send_message(f"Banned {member.display_name}")
 
 @bot.tree.command(name="slowmode", description="Set channel slowmode")
 @app_commands.checks.has_permissions(manage_channels=True)
 async def slowmode(interaction: discord.Interaction, seconds: int):
     await interaction.channel.edit(slowmode_delay=seconds)
-    await interaction.response.send_message(f"⏲️ Slowmode set to {seconds} seconds.")
+    await interaction.response.send_message(f"Slowmode set to {seconds} seconds.")
 
 @bot.tree.command(name="setup_verify", description="Deploy the verification portal")
 @app_commands.checks.has_permissions(administrator=True)
@@ -450,7 +485,7 @@ async def setup_verify(interaction: discord.Interaction):
 @commands.has_permissions(administrator=True)
 async def sync(ctx):
     await bot.tree.sync()
-    await ctx.send("🔄 Commands synced!")
+    await ctx.send("Commands synced!")
 
 if __name__ == "__main__":
     keep_alive()
