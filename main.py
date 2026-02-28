@@ -37,7 +37,7 @@ def home():
     return f'''
     <html>
         <head>
-            <title>LiveBot Control Panel</title>
+            <title>ModBot Control Panel</title>
             <style>
                 body {{ 
                     background-color: #0c0d0e; 
