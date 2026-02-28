@@ -26,7 +26,7 @@ recent_logs = []
 @app.route('/')
 def home():
     # Creating the HTML Dashboard - Clean, ID-free, with Embed Presets
-    log_html = "".join([f"<li style='margin-bottom:12px; border-bottom: 1px solid #4f545c; padding-bottom: 8px;'><b>{l['user']}:</b> {l['content']} <br><small style='color:gray;'>🕒 {l['time']}</small></li>" for l in recent_logs])
+    log_html = "".join([f"<li style='margin-bottom:12px; border-left: 3px solid #5865F2; padding-left: 10px; background: #2f3136; padding: 10px; border-radius: 5px;'><b>{l['user']}:</b> {l['content']} <br><small style='color:#b9bbbe;'>🕒 {l['time']}</small></li>" for l in recent_logs])
     
     # Generate Member Presets
     members_string = "".join([f"<option value='{m.id}'>{m.name}</option>" for g in bot.guilds for m in g.members if not m.bot])
@@ -37,153 +37,170 @@ def home():
     return f'''
     <html>
         <head>
-            <title>Bot Master Console Pro</title>
+            <title>LiveBot Control Panel</title>
             <style>
                 body {{ 
-                    background-color: #23272a; 
-                    color: white; 
-                    font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
+                    background-color: #0c0d0e; 
+                    color: #ffffff; 
+                    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
                     display: flex; 
                     flex-direction: row; 
                     justify-content: center; 
                     align-items: flex-start;
-                    gap: 50px; 
-                    padding: 80px; 
+                    gap: 30px; 
+                    padding: 60px; 
                     margin: 0;
                 }}
                 .card {{ 
-                    background: #2c2f33; 
-                    padding: 55px; 
-                    border-radius: 25px; 
-                    border: 2px solid #7289da; 
-                    width: 900px; 
-                    box-shadow: 0 15px 40px rgba(0,0,0,0.6);
+                    background: #18191c; 
+                    padding: 50px; 
+                    border-radius: 12px; 
+                    border: 1px solid #2f3136; 
+                    width: 950px; 
+                    box-shadow: 0 20px 50px rgba(0,0,0,0.8);
                 }}
                 .log-card {{ 
-                    background: #2c2f33; 
-                    padding: 40px; 
-                    border-radius: 25px; 
-                    border: 2px solid #43b581; 
-                    width: 600px;  
-                    height: 1100px; 
+                    background: #18191c; 
+                    padding: 30px; 
+                    border-radius: 12px; 
+                    border: 1px solid #2f3136; 
+                    width: 500px;  
+                    height: 1150px; 
                     overflow-y: auto; 
                 }}
                 input, select, textarea {{ 
                     width: 100%; 
-                    padding: 22px; 
-                    margin-top: 15px; 
-                    border-radius: 12px; 
-                    border: 2px solid #4f545c; 
-                    background: #40444b; 
-                    color: white; 
+                    padding: 18px; 
+                    margin-top: 10px; 
+                    border-radius: 8px; 
+                    border: 1px solid #202225; 
+                    background: #202225; 
+                    color: #dcddde; 
                     box-sizing: border-box; 
-                    font-size: 1.15em;
-                    transition: all 0.3s;
+                    font-size: 1.1em;
+                    transition: border-color 0.2s, box-shadow 0.2s;
                 }}
                 input:focus, select:focus, textarea:focus {{
-                    border-color: #7289da;
-                    background: #4f545c;
+                    border-color: #5865F2;
                     outline: none;
-                    box-shadow: 0 0 10px rgba(114, 137, 218, 0.2);
+                    box-shadow: 0 0 0 3px rgba(88, 101, 242, 0.2);
                 }}
                 label {{ 
-                    font-size: 1.1em; 
-                    color: #7289da; 
-                    font-weight: bold; 
-                    margin-top: 35px; 
+                    font-size: 0.9em; 
+                    color: #8e9297; 
+                    font-weight: 700; 
+                    margin-top: 30px; 
                     display: flex; 
                     align-items: center;
-                    gap: 10px;
+                    gap: 12px;
                     text-transform: uppercase;
-                    letter-spacing: 1.5px;
+                    letter-spacing: 0.05em;
                 }}
                 button {{ 
-                    background: #43b581; 
+                    background: #5865F2; 
                     color: white; 
                     border: none; 
-                    padding: 30px; 
-                    border-radius: 15px; 
+                    padding: 22px; 
+                    border-radius: 8px; 
                     cursor: pointer; 
-                    font-weight: 900; 
+                    font-weight: 600; 
                     width: 100%; 
-                    margin-top: 50px; 
-                    font-size: 1.6em; 
-                    text-transform: uppercase;
-                    box-shadow: 0 6px 20px rgba(67, 181, 129, 0.4);
-                    transition: all 0.2s;
+                    margin-top: 40px; 
+                    font-size: 1.3em; 
+                    transition: background 0.2s, transform 0.1s;
                 }}
-                button:hover {{ background: #3ca374; transform: translateY(-3px); box-shadow: 0 8px 25px rgba(67, 181, 129, 0.5); }}
-                button:active {{ transform: translateY(1px); }}
+                button:hover {{ background: #4752c4; }}
+                button:active {{ transform: scale(0.98); }}
                 .embed-section {{ 
-                    border-top: 3px solid #4f545c; 
-                    margin-top: 45px; 
-                    padding-top: 40px; 
+                    background: #2f3136;
+                    border-radius: 8px;
+                    margin-top: 40px; 
+                    padding: 30px; 
                 }}
                 textarea {{ 
-                    min-height: 300px; 
+                    min-height: 250px; 
                     resize: vertical; 
                     line-height: 1.6;
+                    font-family: 'Consolas', monospace;
                 }}
-                h2 {{ font-size: 3em; margin-bottom: 40px; color: white; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); }}
-                h3 {{ font-size: 2.2em; margin-bottom: 25px; }}
-                .icon {{ font-style: normal; font-size: 1.3em; }}
+                .char-counter {{
+                    text-align: right;
+                    font-size: 0.8em;
+                    color: #b9bbbe;
+                    margin-top: 5px;
+                }}
+                h2 {{ font-size: 2.2em; margin-bottom: 40px; font-weight: 800; letter-spacing: -1px; }}
+                h3 {{ font-size: 1.5em; margin-bottom: 25px; color: #5865F2; }}
+                .icon {{ font-style: normal; font-size: 1.2em; }}
             </style>
+            <script>
+                function updateCounter() {{
+                    const textarea = document.getElementById('payload_area');
+                    const counter = document.getElementById('char_count');
+                    const length = textarea.value.length;
+                    counter.innerText = length + ' / 2000';
+                    if (length > 2000) {{
+                        counter.style.color = '#ed4245';
+                    }} else {{
+                        counter.style.color = '#b9bbbe';
+                    }}
+                }}
+            </script>
         </head>
         <body>
             <div class="card">
-                <h2 style="text-align:center; margin-top:0;">🌐 Bot Command Pro</h2>
+                <h2 style="text-align:center; margin-top:0;">LIVEBOT PANEL</h2>
                 <form action="/execute" method="post">
-                    <label><i class="icon">🔑</i> Dashboard Password</label>
-                    <input type="password" name="pwd" placeholder="Enter secure admin password...">
+                    <label><i class="icon">🔒</i> Access Token</label>
+                    <input type="password" name="pwd" placeholder="Enter Dashboard Password">
                     
-                    <label><i class="icon">📺</i> Target Channel</label>
+                    <label><i class="icon">💬</i> Target Channel</label>
                     <select name="channel_preset">
-                        <option value="">-- Click to Select Channel --</option>
+                        <option value="">Select a channel...</option>
                         {channels_string}
                     </select>
 
                     <label><i class="icon">👤</i> Target Member</label>
                     <select name="member_target">
-                        <option value="">-- Click to Select Member --</option>
+                        <option value="">Select a member...</option>
                         {members_string}
                     </select>
                     
-                    <label><i class="icon">⚡</i> System Action</label>
-                    <select name="action" style="background: #7289da; font-weight: bold; border-color: #7289da;">
-                        <option value="say">💬 Plain Text Message</option>
-                        <option value="embed">🎨 Custom Rich Embed</option>
-                        <option value="image">🖼️ Quick Image Post</option>
-                        <option value="dm">📧 DM User</option>
-                        <option value="kick">👢 Kick User</option>
-                        <option value="ban">🔨 Ban User</option>
-                        <option value="warn">⚠️ Warn User</option>
-                        <option value="purge">🧹 Purge Channel</option>
+                    <label><i class="icon">🛠️</i> System Operation</label>
+                    <select name="action" style="border-left: 4px solid #5865F2;">
+                        <option value="say">Send Plain Message</option>
+                        <option value="embed">Send Rich Embed</option>
+                        <option value="image">Post Image Link</option>
+                        <option value="dm">Direct Message User</option>
+                        <option value="kick">Kick Member</option>
+                        <option value="ban">Ban Member</option>
+                        <option value="warn">Warn Member</option>
+                        <option value="purge">Purge Messages</option>
                     </select>
                     
                     <div class="embed-section">
-                        <h4 style="color: #b9bbbe; margin: 0 0 20px 0; text-transform: uppercase;">Embed Configuration</h4>
+                        <label><i class="icon">📑</i> Content Title</label>
+                        <input type="text" name="eb_title" placeholder="Optional title...">
                         
-                        <label><i class="icon">📌</i> Embed Title</label>
-                        <input type="text" name="eb_title" placeholder="Announcement Header...">
+                        <label><i class="icon">🎨</i> Embed Color (HEX)</label>
+                        <input type="text" name="eb_color" placeholder="#5865F2">
                         
-                        <label><i class="icon">🌈</i> Accent Color (HEX)</label>
-                        <input type="text" name="eb_color" placeholder="#7289da">
+                        <label><i class="icon">📝</i> Message Body</label>
+                        <textarea id="payload_area" name="payload" placeholder="Type your message content here..." oninput="updateCounter()"></textarea>
+                        <div class="char-counter" id="char_count">0 / 2000</div>
                         
-                        <label><i class="icon">📝</i> Content Body</label>
-                        <textarea name="payload" placeholder="Type your full message or detailed embed description here..."></textarea>
-                        
-                        <label><i class="icon">🖼️</i> Image URL</label>
-                        <input type="text" name="eb_image" placeholder="https://example.com/image.png">
+                        <label><i class="icon">🔗</i> Image / Thumbnail URL</label>
+                        <input type="text" name="eb_image" placeholder="https://">
                     </div>
 
-                    <button type="submit">🚀 Execute Bot Command</button>
+                    <button type="submit">EXECUTE OPERATION</button>
                 </form>
             </div>
 
             <div class="log-card">
-                <h3 style="color: #43b581; margin-top: 0; position: sticky; top: 0; background: #2c2f33; padding: 20px 0; z-index: 10;">📡 Live Activity Stream</h3>
-                <ul style="list-style: none; padding: 0; font-size: 1.2em;">
-                    {log_html if log_html else "<li style='color: #72767d;'>System idle. Waiting for logs...</li>"}
+                <h3 style="margin-top: 0; position: sticky; top: 0; background: #18191c; padding: 15px 0;">ACTIVITY LOG</h3>
+                <ul style="list-style: none; padding: 0; font-size: 1.1em;">
+                    {log_html if log_html else "<li style='color: #4f545c;'>System ready. No recent activity.</li>"}
                 </ul>
             </div>
         </body>
