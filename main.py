@@ -39,19 +39,66 @@ def home():
         <head>
             <title>Bot Master Console</title>
             <style>
-                body {{ background-color: #23272a; color: white; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; flex-direction: row; justify-content: center; gap: 20px; padding: 20px; }}
-                .card {{ background: #2c2f33; padding: 25px; border-radius: 15px; border: 1px solid #7289da; width: 550px; }}
-                .log-card {{ background: #2c2f33; padding: 20px; border-radius: 15px; border: 1px solid #43b581; width: 400px; height: 800px; overflow-y: auto; }}
-                input, select, textarea {{ width: 100%; padding: 12px; margin-top: 5px; border-radius: 5px; border: none; background: #4f545c; color: white; box-sizing: border-box; }}
-                label {{ font-size: 0.8em; color: #b9bbbe; font-weight: bold; margin-top: 10px; display: block; }}
-                button {{ background: #43b581; color: white; border: none; padding: 15px; border-radius: 5px; cursor: pointer; font-weight: bold; width: 100%; margin-top: 20px; font-size: 1.1em; }}
+                body {{ 
+                    background-color: #23272a; 
+                    color: white; 
+                    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+                    display: flex; 
+                    flex-direction: row; 
+                    justify-content: center; 
+                    gap: 30px; 
+                    padding: 40px; 
+                    max-width: 1600px; 
+                    margin: 0 auto; 
+                }}
+                .card {{ 
+                    background: #2c2f33; 
+                    padding: 35px; 
+                    border-radius: 15px; 
+                    border: 1px solid #7289da; 
+                    width: 700px;  /* Increased from 550px */
+                }}
+                .log-card {{ 
+                    background: #2c2f33; 
+                    padding: 30px; 
+                    border-radius: 15px; 
+                    border: 1px solid #43b581; 
+                    width: 500px;  /* Increased from 400px */
+                    height: 900px; /* Increased from 800px */
+                    overflow-y: auto; 
+                }}
+                input, select, textarea {{ 
+                    width: 100%; 
+                    padding: 15px; 
+                    margin-top: 8px; 
+                    border-radius: 8px; 
+                    border: none; 
+                    background: #4f545c; 
+                    color: white; 
+                    box-sizing: border-box; 
+                    font-size: 1em;
+                }}
+                label {{ font-size: 0.9em; color: #b9bbbe; font-weight: bold; margin-top: 15px; display: block; }}
+                button {{ 
+                    background: #43b581; 
+                    color: white; 
+                    border: none; 
+                    padding: 20px; 
+                    border-radius: 8px; 
+                    cursor: pointer; 
+                    font-weight: bold; 
+                    width: 100%; 
+                    margin-top: 25px; 
+                    font-size: 1.2em; 
+                }}
                 button:hover {{ background: #3ca374; }}
-                .embed-section {{ border-top: 1px solid #4f545c; margin-top: 20px; padding-top: 15px; }}
+                .embed-section {{ border-top: 1px solid #4f545c; margin-top: 25px; padding-top: 20px; }}
+                textarea {{ height: 150px; resize: vertical; }} /* Made text area taller */
             </style>
         </head>
         <body>
             <div class="card">
-                <h2 style="text-align:center; margin-top:0;">🤖 Bot Command Center</h2>
+                <h2 style="text-align:center; margin-top:0; font-size: 2em;">🤖 Bot Command Center</h2>
                 <form action="/execute" method="post">
                     <label>DASHBOARD PASSWORD</label>
                     <input type="password" name="pwd" placeholder="Enter Password">
@@ -99,8 +146,8 @@ def home():
             </div>
 
             <div class="log-card">
-                <h3 style="color: #43b581; margin-top: 0; position: sticky; top: 0; background: #2c2f33; padding: 5px 0;">📡 Live Server Feed</h3>
-                <ul style="list-style: none; padding: 0; font-size: 0.9em;">
+                <h3 style="color: #43b581; margin-top: 0; position: sticky; top: 0; background: #2c2f33; padding: 10px 0; font-size: 1.5em;">📡 Live Server Feed</h3>
+                <ul style="list-style: none; padding: 0; font-size: 1em;">
                     {log_html if log_html else "<li>Waiting for activity...</li>"}
                 </ul>
             </div>
@@ -188,7 +235,7 @@ SUPA_URL = os.getenv("SUPABASE_URL")
 SUPA_KEY = os.getenv("SUPABASE_KEY")
 
 # --- Swear Filter List is Here ---
-SWEAR_WORDS = ["nigga", "nigger", "fuck", "shit", "bitch", "asshole", "ass", "hoe"] 
+SWEAR_WORDS = ["badword1", "badword2", "badword3"] 
 MUTED_ROLE_NAME = "Muted"
 VERIFIED_ROLE_NAME = "Member"
 UNVERIFIED_ROLE_NAME = "Unverified"
