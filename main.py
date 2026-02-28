@@ -25,32 +25,50 @@ recent_logs = []
 
 @app.route('/')
 def home():
-    # Creating the HTML Dashboard with Login, Logs, and Full Command Console
+    # Creating the HTML Dashboard with Member List and Image Support
     log_html = "".join([f"<li style='margin-bottom:5px;'><b>{l['user']}:</b> {l['content']} <small style='color:gray;'>({l['time']})</small></li>" for l in recent_logs])
+    
+    # Generate a simple member list string for the dashboard
+    members_string = ""
+    for guild in bot.guilds:
+        for member in guild.members:
+            if not member.bot:
+                members_string += f"<option value='{member.id}'>{member.name} ({member.id})</option>"
+
     return f'''
     <html>
-        <head><title>Bot Executive Control</title></head>
+        <head><title>Bot Master Console</title></head>
         <body style="background-color: #23272a; color: white; font-family: sans-serif; display: flex; flex-direction: row; justify-content: center; gap: 20px; padding: 20px;">
-            <div style="display: flex; flex-direction: column; gap: 20px; width: 450px;">
+            <div style="display: flex; flex-direction: column; gap: 20px; width: 500px;">
                 <div style="background: #2c2f33; padding: 25px; border-radius: 15px; border: 1px solid #7289da;">
-                    <h2 style="text-align:center; margin-top:0;">🤖 Bot Handshake</h2>
+                    <h2 style="text-align:center; margin-top:0;">🤖 Bot Command Center</h2>
                     <form action="/execute" method="post" style="display: flex; flex-direction: column; gap: 10px;">
                         <input type="password" name="pwd" placeholder="DASHBOARD_PWD" style="padding: 10px; border-radius: 5px; border: none;">
-                        <input type="text" name="target_id" placeholder="User ID or Channel ID" style="padding: 10px; border-radius: 5px; border: none;">
-                        <select name="action" style="padding: 10px; border-radius: 5px;">
-                            <option value="say">💬 Say Message (Use Channel ID)</option>
-                            <option value="kick">👢 Kick User (Use User ID)</option>
-                            <option value="ban">🔨 Ban User (Use User ID)</option>
-                            <option value="warn">⚠️ Warn User (Use User ID)</option>
-                            <option value="purge">🧹 Purge Channel (Use Channel ID)</option>
+                        
+                        <label>Select Target Member:</label>
+                        <select name="member_target" style="padding: 10px; border-radius: 5px;">
+                            <option value="">-- Or type ID manually below --</option>
+                            {members_string}
                         </select>
-                        <textarea name="payload" placeholder="Message, Reason, or Amount (Purge)" style="padding: 10px; height: 60px; border-radius: 5px; border: none;"></textarea>
-                        <button type="submit" style="background: #7289da; color: white; border: none; padding: 12px; border-radius: 5px; cursor: pointer; font-weight: bold;">EXECUTE ACTION</button>
+
+                        <input type="text" name="target_id" placeholder="Manual Channel or User ID" style="padding: 10px; border-radius: 5px; border: none;">
+                        
+                        <select name="action" style="padding: 10px; border-radius: 5px;">
+                            <option value="say">💬 Say Message (Channel ID)</option>
+                            <option value="image">🖼️ Send Image URL (Channel ID)</option>
+                            <option value="kick">👢 Kick User</option>
+                            <option value="ban">🔨 Ban User</option>
+                            <option value="warn">⚠️ Warn User</option>
+                            <option value="purge">🧹 Purge Channel</option>
+                        </select>
+                        
+                        <textarea name="payload" placeholder="Message, Reason, or Image URL..." style="padding: 10px; height: 60px; border-radius: 5px; border: none;"></textarea>
+                        <button type="submit" style="background: #7289da; color: white; border: none; padding: 12px; border-radius: 5px; cursor: pointer; font-weight: bold;">EXECUTE</button>
                     </form>
                 </div>
             </div>
 
-            <div style="background: #2c2f33; padding: 20px; border-radius: 15px; border: 1px solid #43b581; width: 400px; height: 600px; overflow-y: auto;">
+            <div style="background: #2c2f33; padding: 20px; border-radius: 15px; border: 1px solid #43b581; width: 400px; height: 650px; overflow-y: auto;">
                 <h3 style="color: #43b581; margin-top: 0;">📡 Live Server Feed</h3>
                 <ul style="list-style: none; padding: 0; font-size: 0.9em;">
                     {log_html if log_html else "<li>Waiting for activity...</li>"}
@@ -64,52 +82,64 @@ def home():
 def execute():
     typed_pwd = request.form.get('pwd')
     target_id = request.form.get('target_id')
+    member_target = request.form.get('member_target')
     action = request.form.get('action')
     payload = request.form.get('payload')
     actual_pwd = os.getenv("DASHBOARD_PWD", "admin")
+
+    # Use the dropdown member ID if manual ID is empty
+    final_target = target_id if target_id else member_target
 
     if typed_pwd != actual_pwd:
         return "❌ Access Denied. <a href='/'>Back</a>"
 
     try:
-        # 1. Action: Say Message
+        # Action: Say Message
         if action == "say":
-            channel = bot.get_channel(int(target_id))
+            channel = bot.get_channel(int(final_target))
             bot.loop.create_task(channel.send(payload))
-            return f"✅ Sent message to #{channel.name}. <a href='/'>Back</a>"
+            return f"✅ Message sent. <a href='/'>Back</a>"
 
-        # 2. Action: Kick
+        # Action: Send Image URL
+        if action == "image":
+            channel = bot.get_channel(int(final_target))
+            embed = discord.Embed()
+            embed.set_image(url=payload)
+            bot.loop.create_task(channel.send(embed=embed))
+            return f"✅ Image sent as Embed. <a href='/'>Back</a>"
+
+        # Action: Kick
         if action == "kick":
             for guild in bot.guilds:
-                member = guild.get_member(int(target_id))
+                member = guild.get_member(int(final_target))
                 if member:
                     bot.loop.create_task(member.kick(reason=payload))
                     return f"✅ Kicked {member.name}. <a href='/'>Back</a>"
 
-        # 3. Action: Ban
+        # Action: Ban
         if action == "ban":
             for guild in bot.guilds:
-                member = guild.get_member(int(target_id))
+                member = guild.get_member(int(final_target))
                 if member:
                     bot.loop.create_task(member.ban(reason=payload))
                     return f"✅ Banned {member.name}. <a href='/'>Back</a>"
 
-        # 4. Action: Warn (Supabase Integration)
+        # Action: Warn
         if action == "warn":
             if supabase:
-                data = {"guild_id": "WebDash", "user_id": target_id, "reason": payload, "moderator": "Web-Admin", "created_at": datetime.datetime.utcnow().isoformat()}
+                data = {"guild_id": "WebDash", "user_id": final_target, "reason": payload, "moderator": "Web-Admin", "created_at": datetime.datetime.utcnow().isoformat()}
                 supabase.table("warnings").insert(data).execute()
-                return f"✅ Warning logged for {target_id}. <a href='/'>Back</a>"
+                return f"✅ Warning logged. <a href='/'>Back</a>"
 
-        # 5. Action: Purge
+        # Action: Purge
         if action == "purge":
-            channel = bot.get_channel(int(target_id))
+            channel = bot.get_channel(int(final_target))
             bot.loop.create_task(channel.purge(limit=int(payload)))
-            return f"✅ Purged {payload} messages in #{channel.name}. <a href='/'>Back</a>"
+            return f"✅ Purged {payload} messages. <a href='/'>Back</a>"
 
-        return "❌ Action failed or ID not found. <a href='/'>Back</a>"
+        return "❌ Action failed. ID not found. <a href='/'>Back</a>"
     except Exception as e:
-        return f"❌ Web-Handshake Error: {e} <a href='/'>Back</a>"
+        return f"❌ Handshake Error: {e} <a href='/'>Back</a>"
 
 def run(): 
     app.run(host='0.0.0.0', port=8080)
