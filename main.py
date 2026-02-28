@@ -25,49 +25,91 @@ recent_logs = []
 
 @app.route('/')
 def home():
-    # Creating the HTML Dashboard with Login and Logs
+    # Creating the HTML Dashboard with Login, Logs, and Full Command Console
     log_html = "".join([f"<li style='margin-bottom:5px;'><b>{l['user']}:</b> {l['content']} <small style='color:gray;'>({l['time']})</small></li>" for l in recent_logs])
     return f'''
     <html>
         <head><title>Bot Executive Control</title></head>
-        <body style="background-color: #23272a; color: white; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; padding: 20px;">
-            <div style="background: #2c2f33; padding: 30px; border-radius: 15px; border: 1px solid #7289da; width: 400px; margin-bottom: 20px;">
-                <h2 style="text-align:center;">🤖 Bot Handshake Login</h2>
-                <form action="/login" method="post" style="display: flex; flex-direction: column; gap: 10px;">
-                    <input type="password" name="pwd" placeholder="Enter DASHBOARD_PWD" style="padding: 10px; border-radius: 5px; border: none;">
-                    <input type="text" name="channel_id" placeholder="Channel ID (Right-click channel to copy)" style="padding: 10px; border-radius: 5px; border: none;">
-                    <textarea name="msg" placeholder="Type your message as the bot..." style="padding: 10px; height: 80px; border-radius: 5px; border: none;"></textarea>
-                    <button type="submit" style="background: #7289da; color: white; border: none; padding: 12px; border-radius: 5px; cursor: pointer; font-weight: bold;">SEND MESSAGE</button>
-                </form>
+        <body style="background-color: #23272a; color: white; font-family: sans-serif; display: flex; flex-direction: row; justify-content: center; gap: 20px; padding: 20px;">
+            <div style="display: flex; flex-direction: column; gap: 20px; width: 450px;">
+                <div style="background: #2c2f33; padding: 25px; border-radius: 15px; border: 1px solid #7289da;">
+                    <h2 style="text-align:center; margin-top:0;">🤖 Bot Handshake</h2>
+                    <form action="/execute" method="post" style="display: flex; flex-direction: column; gap: 10px;">
+                        <input type="password" name="pwd" placeholder="DASHBOARD_PWD" style="padding: 10px; border-radius: 5px; border: none;">
+                        <input type="text" name="target_id" placeholder="User ID or Channel ID" style="padding: 10px; border-radius: 5px; border: none;">
+                        <select name="action" style="padding: 10px; border-radius: 5px;">
+                            <option value="say">💬 Say Message (Use Channel ID)</option>
+                            <option value="kick">👢 Kick User (Use User ID)</option>
+                            <option value="ban">🔨 Ban User (Use User ID)</option>
+                            <option value="warn">⚠️ Warn User (Use User ID)</option>
+                            <option value="purge">🧹 Purge Channel (Use Channel ID)</option>
+                        </select>
+                        <textarea name="payload" placeholder="Message, Reason, or Amount (Purge)" style="padding: 10px; height: 60px; border-radius: 5px; border: none;"></textarea>
+                        <button type="submit" style="background: #7289da; color: white; border: none; padding: 12px; border-radius: 5px; cursor: pointer; font-weight: bold;">EXECUTE ACTION</button>
+                    </form>
+                </div>
             </div>
-            <div style="background: #2c2f33; padding: 20px; border-radius: 15px; border: 1px solid #43b581; width: 400px;">
-                <h3 style="color: #43b581; margin-top: 0;">📡 Recent Server Activity</h3>
+
+            <div style="background: #2c2f33; padding: 20px; border-radius: 15px; border: 1px solid #43b581; width: 400px; height: 600px; overflow-y: auto;">
+                <h3 style="color: #43b581; margin-top: 0;">📡 Live Server Feed</h3>
                 <ul style="list-style: none; padding: 0; font-size: 0.9em;">
-                    {log_html if log_html else "<li>Waiting for new messages...</li>"}
+                    {log_html if log_html else "<li>Waiting for activity...</li>"}
                 </ul>
             </div>
         </body>
     </html>
     '''
 
-@app.route('/login', methods=['POST'])
-def login():
+@app.route('/execute', methods=['POST'])
+def execute():
     typed_pwd = request.form.get('pwd')
-    channel_id = request.form.get('channel_id')
-    msg = request.form.get('msg')
+    target_id = request.form.get('target_id')
+    action = request.form.get('action')
+    payload = request.form.get('payload')
     actual_pwd = os.getenv("DASHBOARD_PWD", "admin")
 
     if typed_pwd != actual_pwd:
-        return "❌ Access Denied: Incorrect Password. <a href='/'>Back</a>"
+        return "❌ Access Denied. <a href='/'>Back</a>"
 
     try:
-        channel = bot.get_channel(int(channel_id))
-        if channel:
-            bot.loop.create_task(channel.send(msg))
-            return f"✅ Successfully sent to #{channel.name}! <a href='/'>Return to Dashboard</a>"
-        return "❌ Error: Bot cannot find that Channel ID. <a href='/'>Back</a>"
+        # 1. Action: Say Message
+        if action == "say":
+            channel = bot.get_channel(int(target_id))
+            bot.loop.create_task(channel.send(payload))
+            return f"✅ Sent message to #{channel.name}. <a href='/'>Back</a>"
+
+        # 2. Action: Kick
+        if action == "kick":
+            for guild in bot.guilds:
+                member = guild.get_member(int(target_id))
+                if member:
+                    bot.loop.create_task(member.kick(reason=payload))
+                    return f"✅ Kicked {member.name}. <a href='/'>Back</a>"
+
+        # 3. Action: Ban
+        if action == "ban":
+            for guild in bot.guilds:
+                member = guild.get_member(int(target_id))
+                if member:
+                    bot.loop.create_task(member.ban(reason=payload))
+                    return f"✅ Banned {member.name}. <a href='/'>Back</a>"
+
+        # 4. Action: Warn (Supabase Integration)
+        if action == "warn":
+            if supabase:
+                data = {"guild_id": "WebDash", "user_id": target_id, "reason": payload, "moderator": "Web-Admin", "created_at": datetime.datetime.utcnow().isoformat()}
+                supabase.table("warnings").insert(data).execute()
+                return f"✅ Warning logged for {target_id}. <a href='/'>Back</a>"
+
+        # 5. Action: Purge
+        if action == "purge":
+            channel = bot.get_channel(int(target_id))
+            bot.loop.create_task(channel.purge(limit=int(payload)))
+            return f"✅ Purged {payload} messages in #{channel.name}. <a href='/'>Back</a>"
+
+        return "❌ Action failed or ID not found. <a href='/'>Back</a>"
     except Exception as e:
-        return f"❌ Connection Error: {e} <a href='/'>Back</a>"
+        return f"❌ Web-Handshake Error: {e} <a href='/'>Back</a>"
 
 def run(): 
     app.run(host='0.0.0.0', port=8080)
