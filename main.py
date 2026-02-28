@@ -187,7 +187,8 @@ WEBHOOK_URL = os.getenv("WEBHOOK_URL")
 SUPA_URL = os.getenv("SUPABASE_URL")
 SUPA_KEY = os.getenv("SUPABASE_KEY")
 
-SWEAR_WORDS = ["badword1", "badword2", "badword3"] 
+# --- Swear Filter List is Here ---
+SWEAR_WORDS = ["nigga", "nigger", "fuck", "shit", "bitch", "asshole", "ass", "hoe"] 
 MUTED_ROLE_NAME = "Muted"
 VERIFIED_ROLE_NAME = "Member"
 UNVERIFIED_ROLE_NAME = "Unverified"
@@ -302,7 +303,7 @@ async def on_message(message):
     recent_logs.insert(0, {"user": message.author.name, "content": message.content[:50], "time": timestamp})
     if len(recent_logs) > 15: recent_logs.pop()
 
-    # Word Filter
+    # --- Swear Filter Execution is Here ---
     if any(word.lower() in message.content.lower() for word in SWEAR_WORDS):
         await message.delete()
         send_to_webhook("🚫 Filtered", f"User: {message.author.mention}\nMsg: {message.content}", discord.Color.red(), message.author)
