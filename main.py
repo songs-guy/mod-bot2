@@ -43,7 +43,7 @@ def home():
                 <div style="background: #2c2f33; padding: 25px; border-radius: 15px; border: 1px solid #7289da;">
                     <h2 style="text-align:center; margin-top:0;">🤖 Bot Command Center</h2>
                     <form action="/execute" method="post" style="display: flex; flex-direction: column; gap: 10px;">
-                        <input type="password" name="pwd" placeholder="DASHBOARD_PWD" style="padding: 10px; border-radius: 5px; border: none;">
+                        <input type="password" name="pwd" placeholder="ENTER PASSWORD" style="padding: 10px; border-radius: 5px; border: none;">
                         
                         <label>Select Target Member:</label>
                         <select name="member_target" style="padding: 10px; border-radius: 5px;">
