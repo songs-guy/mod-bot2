@@ -13,16 +13,16 @@ from threading import Thread
 from flask import Flask
 from supabase import create_client, Client
 
-# ----- Standard Logging Setup -----
+# ----- Logging Setup -----
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger('discord_bot')
 
-# ----- Render Keep-Alive Server -----
+# ----- Flask Server for Render -----
 app = Flask('')
 
 @app.route('/')
 def home(): 
-    return "Ultra-Security Moderation Bot is Online"
+    return "Ultra-Security Bot is Online"
 
 def run(): 
     app.run(host='0.0.0.0', port=8080)
@@ -42,18 +42,19 @@ VERIFIED_ROLE_NAME = "Member"
 UNVERIFIED_ROLE_NAME = "Unverified"
 MIN_ACCOUNT_AGE_DAYS = 1
 
-# Initialize Supabase Client
+# Initialize Supabase
+supabase = None
 if SUPA_URL and SUPA_KEY:
-    supabase: Client = create_client(SUPA_URL, SUPA_KEY)
-    logger.info("✅ Supabase connection initialized.")
-else:
-    supabase = None
-    logger.error("🚨 Supabase credentials missing!")
+    try:
+        supabase = create_client(SUPA_URL, SUPA_KEY)
+        logger.info("✅ Supabase connection initialized.")
+    except Exception as e:
+        logger.error(f"❌ Supabase failed: {e}")
 
 intents = discord.Intents.all()
 user_message_logs = defaultdict(list)
 
-# ----- Captcha Modal System -----
+# ----- Captcha Modal Logic -----
 
 class CaptchaModal(discord.ui.Modal, title="Security Verification"):
     def __init__(self, answer: int):
@@ -74,11 +75,8 @@ class CaptchaModal(discord.ui.Modal, title="Security Verification"):
                 verified_role = discord.utils.get(interaction.guild.roles, name=VERIFIED_ROLE_NAME)
                 unverified_role = discord.utils.get(interaction.guild.roles, name=UNVERIFIED_ROLE_NAME)
 
-                if not verified_role:
-                    await interaction.response.send_message(f"❌ Error: Role '{VERIFIED_ROLE_NAME}' not found.", ephemeral=True)
-                    return
-
-                await interaction.user.add_roles(verified_role)
+                if verified_role:
+                    await interaction.user.add_roles(verified_role)
                 if unverified_role and unverified_role in interaction.user.roles:
                     await interaction.user.remove_roles(unverified_role)
                 
@@ -103,24 +101,6 @@ class VerifyView(discord.ui.View):
         answer = random.randint(11, 60)
         await interaction.response.send_modal(CaptchaModal(answer))
 
-# ----- Bot Core Class -----
-
-class MyBot(commands.Bot):
-    def __init__(self):
-        super().__init__(
-            command_prefix="!", 
-            intents=intents,
-            status=discord.Status.online,
-            activity=discord.Activity(type=discord.ActivityType.watching, name="over the server")
-        )
-
-    async def setup_hook(self):
-        self.add_view(VerifyView())
-        await self.tree.sync()
-        logger.info("Slash commands and UI views synced.")
-
-bot = MyBot()
-
 # ----- Helper Functions -----
 
 def send_to_webhook(title, description, color, member=None):
@@ -143,6 +123,19 @@ async def ensure_muted_role(guild):
         except: pass
     return role
 
+# ----- Bot Class -----
+
+class MyBot(commands.Bot):
+    def __init__(self):
+        super().__init__(command_prefix="!", intents=intents)
+
+    async def setup_hook(self):
+        self.add_view(VerifyView())
+        await self.tree.sync()
+        logger.info("Slash commands synced.")
+
+bot = MyBot()
+
 # ----- Global Events -----
 
 @bot.event
@@ -153,11 +146,13 @@ async def on_ready():
 async def on_message(message):
     if message.author.bot or not message.guild: return
 
+    # Word Filter
     if any(word.lower() in message.content.lower() for word in SWEAR_WORDS):
         await message.delete()
-        send_to_webhook("🚫 Content Filtered", f"User: {message.author.mention}\nMessage: {message.content}", discord.Color.red(), message.author)
+        send_to_webhook("🚫 Filtered", f"User: {message.author.mention}\nMsg: {message.content}", discord.Color.red(), message.author)
         return
 
+    # Anti-Spam
     now = datetime.datetime.utcnow()
     user_message_logs[message.author.id].append(now)
     user_message_logs[message.author.id] = [t for t in user_message_logs[message.author.id] if (now - t).total_seconds() < 5]
@@ -178,7 +173,7 @@ async def on_message(message):
 @bot.tree.command(name="warn", description="Issue a permanent warning")
 @app_commands.checks.has_permissions(manage_messages=True)
 async def warn(interaction: discord.Interaction, member: discord.Member, reason: str):
-    if not supabase: return await interaction.response.send_message("❌ Database not connected.", ephemeral=True)
+    if not supabase: return await interaction.response.send_message("❌ DB not connected.", ephemeral=True)
     
     data = {
         "guild_id": str(interaction.guild.id),
@@ -190,38 +185,54 @@ async def warn(interaction: discord.Interaction, member: discord.Member, reason:
     
     try:
         supabase.table("warnings").insert(data).execute()
-        await interaction.response.send_message(f"⚠️ **{member.display_name}** warned: `{reason}`")
-        send_to_webhook("⚠️ Warned", f"User: {member.mention}\nReason: {reason}", discord.Color.gold(), member)
+        await interaction.response.send_message(f"⚠️ **{member.display_name}** warned for: `{reason}`")
+        send_to_webhook("⚠️ Warned", f"User: {member.mention}\nMod: {interaction.user.mention}\nReason: {reason}", discord.Color.gold(), member)
     except Exception as e:
-        await interaction.response.send_message(f"❌ DB Error. Did you run the SQL command in Supabase? Error: {e}", ephemeral=True)
+        await interaction.response.send_message(f"❌ DB Error: {e}", ephemeral=True)
 
-@bot.tree.command(name="warnings", description="View a member's record")
+@bot.tree.command(name="warnings", description="View a member's warning history")
 async def warnings(interaction: discord.Interaction, member: discord.Member):
-    if not supabase: return await interaction.response.send_message("❌ Database Error.", ephemeral=True)
+    if not supabase: return await interaction.response.send_message("❌ DB error.", ephemeral=True)
     
-    response = supabase.table("warnings").select("*").eq("user_id", str(member.id)).execute()
-    user_warns = response.data
+    try:
+        response = supabase.table("warnings").select("*").eq("user_id", str(member.id)).execute()
+        user_warns = response.data
 
-    if not user_warns:
-        return await interaction.response.send_message(f"✅ {member.display_name} has no warnings.")
+        if not user_warns:
+            return await interaction.response.send_message(f"✅ {member.display_name} has a clean record.")
 
-    embed = discord.Embed(title=f"Record: {member.display_name}", color=discord.Color.orange())
-    for w in user_warns:
-        date = w['created_at'].split("T")[0]
-        embed.add_field(name=f"Date: {date}", value=f"Reason: {w['reason']}\nBy: {w['moderator']}", inline=False)
-    
-    await interaction.response.send_message(embed=embed)
+        embed = discord.Embed(title=f"Record: {member.display_name}", color=discord.Color.orange())
+        for w in user_warns:
+            date = w['created_at'].split("T")[0]
+            embed.add_field(name=f"Date: {date}", value=f"Reason: {w['reason']}\nBy: {w['moderator']}", inline=False)
+        
+        await interaction.response.send_message(embed=embed)
+    except Exception as e:
+        await interaction.response.send_message(f"❌ Error: {e}")
 
 @bot.tree.command(name="clear_warnings", description="Wipe a member's record")
 @app_commands.checks.has_permissions(manage_messages=True)
 async def clear_warnings(interaction: discord.Interaction, member: discord.Member):
+    if not supabase: return
     supabase.table("warnings").delete().eq("user_id", str(member.id)).execute()
     await interaction.response.send_message(f"🧹 Cleared warnings for {member.mention}.")
+
+@bot.tree.command(name="kick", description="Kick a member")
+@app_commands.checks.has_permissions(kick_members=True)
+async def kick(interaction: discord.Interaction, member: discord.Member, reason: str = "No reason provided"):
+    await member.kick(reason=reason)
+    await interaction.response.send_message(f"✅ Kicked {member.display_name}")
+
+@bot.tree.command(name="ban", description="Ban a member")
+@app_commands.checks.has_permissions(ban_members=True)
+async def ban(interaction: discord.Interaction, member: discord.Member, reason: str = "No reason provided"):
+    await member.ban(reason=reason)
+    await interaction.response.send_message(f"🔨 Banned {member.display_name}")
 
 @bot.tree.command(name="setup_verify", description="Deploy the verification portal")
 @app_commands.checks.has_permissions(administrator=True)
 async def setup_verify(interaction: discord.Interaction):
-    embed = discord.Embed(title="🛡️ Security Verification", description="Click the button to verify.", color=discord.Color.blue())
+    embed = discord.Embed(title="🛡️ Security Verification", description="Click the button below to verify.", color=discord.Color.blue())
     await interaction.channel.send(embed=embed, view=VerifyView())
     await interaction.response.send_message("Portal deployed.", ephemeral=True)
 
@@ -229,8 +240,13 @@ async def setup_verify(interaction: discord.Interaction):
 @commands.has_permissions(administrator=True)
 async def sync(ctx):
     await bot.tree.sync()
-    await ctx.send("🔄 Synced!")
+    await ctx.send("🔄 Commands synced!")
+
+# ----- Execution -----
 
 if __name__ == "__main__":
     keep_alive()
-    bot.run(TOKEN)
+    if TOKEN:
+        bot.run(TOKEN)
+    else:
+        logger.error("❌ NO TOKEN FOUND")
