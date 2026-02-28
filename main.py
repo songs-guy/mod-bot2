@@ -25,64 +25,81 @@ recent_logs = []
 
 @app.route('/')
 def home():
-    # Creating the HTML Dashboard with Member and Channel Presets
+    # Creating the HTML Dashboard - Clean, ID-free, with Embed Presets
     log_html = "".join([f"<li style='margin-bottom:5px;'><b>{l['user']}:</b> {l['content']} <small style='color:gray;'>({l['time']})</small></li>" for l in recent_logs])
     
     # Generate Member Presets
-    members_string = ""
-    for guild in bot.guilds:
-        for member in guild.members:
-            if not member.bot:
-                members_string += f"<option value='{member.id}'>{member.name} ({member.id})</option>"
+    members_string = "".join([f"<option value='{m.id}'>{m.name}</option>" for g in bot.guilds for m in g.members if not m.bot])
 
-    # Generate Channel Presets (New logic)
-    channels_string = ""
-    for guild in bot.guilds:
-        for channel in guild.text_channels:
-            channels_string += f"<option value='{channel.id}'>#{channel.name}</option>"
+    # Generate Channel Presets
+    channels_string = "".join([f"<option value='{c.id}'>#{c.name}</option>" for g in bot.guilds for c in g.text_channels])
 
     return f'''
     <html>
-        <head><title>Bot Master Console</title></head>
-        <body style="background-color: #23272a; color: white; font-family: sans-serif; display: flex; flex-direction: row; justify-content: center; gap: 20px; padding: 20px;">
-            <div style="display: flex; flex-direction: column; gap: 20px; width: 500px;">
-                <div style="background: #2c2f33; padding: 25px; border-radius: 15px; border: 1px solid #7289da;">
-                    <h2 style="text-align:center; margin-top:0;">🤖 Bot Command Center</h2>
-                    <form action="/execute" method="post" style="display: flex; flex-direction: column; gap: 10px;">
-                        <input type="password" name="pwd" placeholder="DASHBOARD_PWD" style="padding: 10px; border-radius: 5px; border: none;">
-                        
-                        <label>Target Channel (Preset):</label>
-                        <select name="channel_preset" style="padding: 10px; border-radius: 5px;">
-                            <option value="">-- Select Channel --</option>
-                            {channels_string}
-                        </select>
+        <head>
+            <title>Bot Master Console</title>
+            <style>
+                body {{ background-color: #23272a; color: white; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; flex-direction: row; justify-content: center; gap: 20px; padding: 20px; }}
+                .card {{ background: #2c2f33; padding: 25px; border-radius: 15px; border: 1px solid #7289da; width: 550px; }}
+                .log-card {{ background: #2c2f33; padding: 20px; border-radius: 15px; border: 1px solid #43b581; width: 400px; height: 800px; overflow-y: auto; }}
+                input, select, textarea {{ width: 100%; padding: 12px; margin-top: 5px; border-radius: 5px; border: none; background: #4f545c; color: white; box-sizing: border-box; }}
+                label {{ font-size: 0.8em; color: #b9bbbe; font-weight: bold; margin-top: 10px; display: block; }}
+                button {{ background: #43b581; color: white; border: none; padding: 15px; border-radius: 5px; cursor: pointer; font-weight: bold; width: 100%; margin-top: 20px; font-size: 1.1em; }}
+                button:hover {{ background: #3ca374; }}
+                .embed-section {{ border-top: 1px solid #4f545c; margin-top: 20px; padding-top: 15px; }}
+            </style>
+        </head>
+        <body>
+            <div class="card">
+                <h2 style="text-align:center; margin-top:0;">🤖 Bot Command Center</h2>
+                <form action="/execute" method="post">
+                    <label>DASHBOARD PASSWORD</label>
+                    <input type="password" name="pwd" placeholder="Enter Password">
+                    
+                    <label>TARGET CHANNEL (For Messages/Embeds)</label>
+                    <select name="channel_preset">
+                        <option value="">-- Select Channel --</option>
+                        {channels_string}
+                    </select>
 
-                        <label>Target Member (Preset):</label>
-                        <select name="member_target" style="padding: 10px; border-radius: 5px;">
-                            <option value="">-- Select Member --</option>
-                            {members_string}
-                        </select>
+                    <label>TARGET MEMBER (For Mod Actions/DMs)</label>
+                    <select name="member_target">
+                        <option value="">-- Select Member --</option>
+                        {members_string}
+                    </select>
+                    
+                    <label>ACTION</label>
+                    <select name="action" style="background: #7289da; font-weight: bold;">
+                        <option value="say">💬 Plain Text Message</option>
+                        <option value="embed">🎨 Custom Rich Embed</option>
+                        <option value="image">🖼️ Quick Image Post</option>
+                        <option value="dm">📧 DM User</option>
+                        <option value="kick">👢 Kick User</option>
+                        <option value="ban">🔨 Ban User</option>
+                        <option value="warn">⚠️ Warn User</option>
+                        <option value="purge">🧹 Purge Channel</option>
+                    </select>
+                    
+                    <div class="embed-section">
+                        <label>EMBED TITLE / HEADER</label>
+                        <input type="text" name="eb_title" placeholder="e.g. Server Announcement">
+                        
+                        <label>EMBED ACCENT COLOR (HEX)</label>
+                        <input type="text" name="eb_color" placeholder="#7289da">
+                        
+                        <label>MAIN CONTENT / DESCRIPTION</label>
+                        <textarea name="payload" placeholder="Type your message or embed description here..."></textarea>
+                        
+                        <label>IMAGE URL (Embed Bottom)</label>
+                        <input type="text" name="eb_image" placeholder="https://link-to-image.png">
+                    </div>
 
-                        <input type="text" name="target_id" placeholder="Manual ID (Override)" style="padding: 10px; border-radius: 5px; border: none;">
-                        
-                        <select name="action" style="padding: 10px; border-radius: 5px;">
-                            <option value="say">💬 Say Message</option>
-                            <option value="image">🖼️ Send Image URL</option>
-                            <option value="kick">👢 Kick User</option>
-                            <option value="ban">🔨 Ban User</option>
-                            <option value="warn">⚠️ Warn User</option>
-                            <option value="purge">🧹 Purge Channel</option>
-                            <option value="dm">📧 DM User</option>
-                        </select>
-                        
-                        <textarea name="payload" placeholder="Message, Reason, or Image URL..." style="padding: 10px; height: 60px; border-radius: 5px; border: none;"></textarea>
-                        <button type="submit" style="background: #7289da; color: white; border: none; padding: 12px; border-radius: 5px; cursor: pointer; font-weight: bold;">EXECUTE</button>
-                    </form>
-                </div>
+                    <button type="submit">EXECUTE ACTION</button>
+                </form>
             </div>
 
-            <div style="background: #2c2f33; padding: 20px; border-radius: 15px; border: 1px solid #43b581; width: 400px; height: 650px; overflow-y: auto;">
-                <h3 style="color: #43b581; margin-top: 0;">📡 Live Server Feed</h3>
+            <div class="log-card">
+                <h3 style="color: #43b581; margin-top: 0; position: sticky; top: 0; background: #2c2f33; padding: 5px 0;">📡 Live Server Feed</h3>
                 <ul style="list-style: none; padding: 0; font-size: 0.9em;">
                     {log_html if log_html else "<li>Waiting for activity...</li>"}
                 </ul>
@@ -94,77 +111,65 @@ def home():
 @app.route('/execute', methods=['POST'])
 def execute():
     typed_pwd = request.form.get('pwd')
-    target_id = request.form.get('target_id')
     channel_preset = request.form.get('channel_preset')
     member_target = request.form.get('member_target')
     action = request.form.get('action')
     payload = request.form.get('payload')
+    
+    eb_title = request.form.get('eb_title')
+    eb_color_str = request.form.get('eb_color', '#7289da')
+    eb_image = request.form.get('eb_image')
+
     actual_pwd = os.getenv("DASHBOARD_PWD", "admin")
 
-    # Determine final target based on priority: Manual ID > Member Dropdown > Channel Dropdown
-    final_target = target_id
-    if not final_target:
-        if action in ["say", "image", "purge"]:
-            final_target = channel_preset
-        else:
-            final_target = member_target
+    # Selection Logic based on Action
+    final_target = channel_preset if action in ["say", "embed", "image", "purge"] else member_target
 
-    if typed_pwd != actual_pwd:
-        return "❌ Access Denied. <a href='/'>Back</a>"
-
-    if not final_target:
-        return "⚠️ No target selected! <a href='/'>Back</a>"
+    if typed_pwd != actual_pwd: return "❌ Access Denied. <a href='/'>Back</a>"
+    if not final_target: return "⚠️ Error: Please select a target from the dropdowns. <a href='/'>Back</a>"
 
     try:
-        # Action: Say Message
+        if action == "embed":
+            channel = bot.get_channel(int(final_target))
+            color_value = int(eb_color_str.lstrip('#'), 16) if eb_color_str.startswith('#') else 0x7289da
+            embed = discord.Embed(title=eb_title, description=payload, color=color_value)
+            if eb_image: embed.set_image(url=eb_image)
+            bot.loop.create_task(channel.send(embed=embed))
+            return f"✅ Embed sent to #{channel.name}. <a href='/'>Back</a>"
+
         if action == "say":
             channel = bot.get_channel(int(final_target))
             bot.loop.create_task(channel.send(payload))
-            return f"✅ Message sent to #{channel.name}. <a href='/'>Back</a>"
+            return f"✅ Message sent. <a href='/'>Back</a>"
 
-        # Action: Send Image URL
         if action == "image":
             channel = bot.get_channel(int(final_target))
-            embed = discord.Embed()
-            embed.set_image(url=payload)
+            embed = discord.Embed().set_image(url=payload)
             bot.loop.create_task(channel.send(payload, embed=embed))
-            return f"✅ Image sent to #{channel.name}. <a href='/'>Back</a>"
+            return f"✅ Image sent. <a href='/'>Back</a>"
 
-        # Action: DM User
         if action == "dm":
             user = bot.get_user(int(final_target))
             if user:
                 bot.loop.create_task(user.send(payload))
                 return f"✅ DM sent to {user.name}. <a href='/'>Back</a>"
 
-        # Action: Kick
         if action == "kick":
-            for guild in bot.guilds:
-                member = guild.get_member(int(final_target))
-                if member:
-                    bot.loop.create_task(member.kick(reason=payload))
-                    return f"✅ Kicked {member.name}. <a href='/'>Back</a>"
-
-        # Action: Ban
+            for g in bot.guilds:
+                m = g.get_member(int(final_target))
+                if m: bot.loop.create_task(m.kick(reason=payload)); return f"✅ Kicked {m.name}. <a href='/'>Back</a>"
         if action == "ban":
-            for guild in bot.guilds:
-                member = guild.get_member(int(final_target))
-                if member:
-                    bot.loop.create_task(member.ban(reason=payload))
-                    return f"✅ Banned {member.name}. <a href='/'>Back</a>"
-
-        # Action: Warn
-        if action == "warn":
-            if supabase:
-                data = {"guild_id": "WebDash", "user_id": final_target, "reason": payload, "moderator": "Web-Admin", "created_at": datetime.datetime.utcnow().isoformat()}
-                supabase.table("warnings").insert(data).execute()
-                return f"✅ Warning logged. <a href='/'>Back</a>"
-
-        # Action: Purge
+            for g in bot.guilds:
+                m = g.get_member(int(final_target))
+                if m: bot.loop.create_task(m.ban(reason=payload)); return f"✅ Banned {m.name}. <a href='/'>Back</a>"
         if action == "purge":
             channel = bot.get_channel(int(final_target))
             bot.loop.create_task(channel.purge(limit=int(payload)))
             return f"✅ Purged {payload} messages. <a href='/'>Back</a>"
+        if action == "warn" and supabase:
+            data = {"guild_id": "Web", "user_id": final_target, "reason": payload, "moderator": "Web-Admin", "created_at": datetime.datetime.utcnow().isoformat()}
+            supabase.table("warnings").insert(data).execute()
+            return f"✅ Warning logged. <a href='/'>Back</a>"
 
         return "❌ Action failed. <a href='/'>Back</a>"
     except Exception as e:
@@ -295,7 +300,7 @@ async def on_message(message):
     # Adding to Web Dashboard Logs
     timestamp = datetime.datetime.now().strftime("%H:%M:%S")
     recent_logs.insert(0, {"user": message.author.name, "content": message.content[:50], "time": timestamp})
-    if len(recent_logs) > 10: recent_logs.pop()
+    if len(recent_logs) > 15: recent_logs.pop()
 
     # Word Filter
     if any(word.lower() in message.content.lower() for word in SWEAR_WORDS):
@@ -367,13 +372,6 @@ async def warnings(interaction: discord.Interaction, member: discord.Member):
         await interaction.response.send_message(embed=embed)
     except Exception as e:
         await interaction.response.send_message(f"❌ Error: {e}")
-
-@bot.tree.command(name="clear_warnings", description="Wipe a member's record")
-@app_commands.checks.has_permissions(manage_messages=True)
-async def clear_warnings(interaction: discord.Interaction, member: discord.Member):
-    if not supabase: return
-    supabase.table("warnings").delete().eq("user_id", str(member.id)).execute()
-    await interaction.response.send_message(f"🧹 Cleared warnings for {member.mention}.")
 
 @bot.tree.command(name="kick", description="Kick a member")
 @app_commands.checks.has_permissions(kick_members=True)
