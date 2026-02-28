@@ -25,15 +25,21 @@ recent_logs = []
 
 @app.route('/')
 def home():
-    # Creating the HTML Dashboard with Member List and Image Support
+    # Creating the HTML Dashboard with Member and Channel Presets
     log_html = "".join([f"<li style='margin-bottom:5px;'><b>{l['user']}:</b> {l['content']} <small style='color:gray;'>({l['time']})</small></li>" for l in recent_logs])
     
-    # Generate a simple member list string for the dashboard
+    # Generate Member Presets
     members_string = ""
     for guild in bot.guilds:
         for member in guild.members:
             if not member.bot:
                 members_string += f"<option value='{member.id}'>{member.name} ({member.id})</option>"
+
+    # Generate Channel Presets (New logic)
+    channels_string = ""
+    for guild in bot.guilds:
+        for channel in guild.text_channels:
+            channels_string += f"<option value='{channel.id}'>#{channel.name}</option>"
 
     return f'''
     <html>
@@ -43,24 +49,30 @@ def home():
                 <div style="background: #2c2f33; padding: 25px; border-radius: 15px; border: 1px solid #7289da;">
                     <h2 style="text-align:center; margin-top:0;">🤖 Bot Command Center</h2>
                     <form action="/execute" method="post" style="display: flex; flex-direction: column; gap: 10px;">
-                        <input type="password" name="pwd" placeholder="ENTER PASSWORD" style="padding: 10px; border-radius: 5px; border: none;">
+                        <input type="password" name="pwd" placeholder="DASHBOARD_PWD" style="padding: 10px; border-radius: 5px; border: none;">
                         
-                        <label>Select Target Member:</label>
+                        <label>Target Channel (Preset):</label>
+                        <select name="channel_preset" style="padding: 10px; border-radius: 5px;">
+                            <option value="">-- Select Channel --</option>
+                            {channels_string}
+                        </select>
+
+                        <label>Target Member (Preset):</label>
                         <select name="member_target" style="padding: 10px; border-radius: 5px;">
-                            <option value="">-- Or type ID manually below --</option>
+                            <option value="">-- Select Member --</option>
                             {members_string}
                         </select>
 
-                        <input type="text" name="target_id" placeholder="Manual Channel or User ID" style="padding: 10px; border-radius: 5px; border: none;">
+                        <input type="text" name="target_id" placeholder="Manual ID (Override)" style="padding: 10px; border-radius: 5px; border: none;">
                         
                         <select name="action" style="padding: 10px; border-radius: 5px;">
-                            <option value="say">💬 Say Message (Channel ID)</option>
-                            <option value="image">🖼️ Send Image URL (Channel ID)</option>
+                            <option value="say">💬 Say Message</option>
+                            <option value="image">🖼️ Send Image URL</option>
                             <option value="kick">👢 Kick User</option>
                             <option value="ban">🔨 Ban User</option>
                             <option value="warn">⚠️ Warn User</option>
                             <option value="purge">🧹 Purge Channel</option>
-                            <option value="dm">📧 DM User (User ID)</option>
+                            <option value="dm">📧 DM User</option>
                         </select>
                         
                         <textarea name="payload" placeholder="Message, Reason, or Image URL..." style="padding: 10px; height: 60px; border-radius: 5px; border: none;"></textarea>
@@ -83,39 +95,47 @@ def home():
 def execute():
     typed_pwd = request.form.get('pwd')
     target_id = request.form.get('target_id')
+    channel_preset = request.form.get('channel_preset')
     member_target = request.form.get('member_target')
     action = request.form.get('action')
     payload = request.form.get('payload')
     actual_pwd = os.getenv("DASHBOARD_PWD", "admin")
 
-    final_target = target_id if target_id else member_target
+    # Determine final target based on priority: Manual ID > Member Dropdown > Channel Dropdown
+    final_target = target_id
+    if not final_target:
+        if action in ["say", "image", "purge"]:
+            final_target = channel_preset
+        else:
+            final_target = member_target
 
     if typed_pwd != actual_pwd:
         return "❌ Access Denied. <a href='/'>Back</a>"
+
+    if not final_target:
+        return "⚠️ No target selected! <a href='/'>Back</a>"
 
     try:
         # Action: Say Message
         if action == "say":
             channel = bot.get_channel(int(final_target))
             bot.loop.create_task(channel.send(payload))
-            return f"✅ Message sent. <a href='/'>Back</a>"
+            return f"✅ Message sent to #{channel.name}. <a href='/'>Back</a>"
 
-        # Action: Send Image URL (Enhanced with fallback)
+        # Action: Send Image URL
         if action == "image":
             channel = bot.get_channel(int(final_target))
-            # Try sending as an Embed first
             embed = discord.Embed()
             embed.set_image(url=payload)
-            bot.loop.create_task(channel.send(payload, embed=embed)) # Sends URL + Embed for max compatibility
-            return f"✅ Image Command Executed. <a href='/'>Back</a>"
+            bot.loop.create_task(channel.send(payload, embed=embed))
+            return f"✅ Image sent to #{channel.name}. <a href='/'>Back</a>"
 
         # Action: DM User
         if action == "dm":
-            for guild in bot.guilds:
-                member = guild.get_member(int(final_target))
-                if member:
-                    bot.loop.create_task(member.send(payload))
-                    return f"✅ DM sent to {member.name}. <a href='/'>Back</a>"
+            user = bot.get_user(int(final_target))
+            if user:
+                bot.loop.create_task(user.send(payload))
+                return f"✅ DM sent to {user.name}. <a href='/'>Back</a>"
 
         # Action: Kick
         if action == "kick":
@@ -146,7 +166,7 @@ def execute():
             bot.loop.create_task(channel.purge(limit=int(payload)))
             return f"✅ Purged {payload} messages. <a href='/'>Back</a>"
 
-        return "❌ Action failed. ID not found. <a href='/'>Back</a>"
+        return "❌ Action failed. <a href='/'>Back</a>"
     except Exception as e:
         return f"❌ Handshake Error: {e} <a href='/'>Back</a>"
 
