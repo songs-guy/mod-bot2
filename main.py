@@ -10,7 +10,7 @@ import logging
 import time
 from collections import defaultdict
 from threading import Thread
-from flask import Flask
+from flask import Flask, request
 from supabase import create_client, Client
 
 # ----- Logging Setup -----
@@ -20,9 +20,54 @@ logger = logging.getLogger('discord_bot')
 # ----- Flask Server for Render -----
 app = Flask('')
 
+# Storage for Recent Logs on the Webpage
+recent_logs = []
+
 @app.route('/')
-def home(): 
-    return "Ultra-Security Bot is Online"
+def home():
+    # Creating the HTML Dashboard with Login and Logs
+    log_html = "".join([f"<li style='margin-bottom:5px;'><b>{l['user']}:</b> {l['content']} <small style='color:gray;'>({l['time']})</small></li>" for l in recent_logs])
+    return f'''
+    <html>
+        <head><title>Bot Executive Control</title></head>
+        <body style="background-color: #23272a; color: white; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; padding: 20px;">
+            <div style="background: #2c2f33; padding: 30px; border-radius: 15px; border: 1px solid #7289da; width: 400px; margin-bottom: 20px;">
+                <h2 style="text-align:center;">🤖 Bot Handshake Login</h2>
+                <form action="/login" method="post" style="display: flex; flex-direction: column; gap: 10px;">
+                    <input type="password" name="pwd" placeholder="Enter DASHBOARD_PWD" style="padding: 10px; border-radius: 5px; border: none;">
+                    <input type="text" name="channel_id" placeholder="Channel ID (Right-click channel to copy)" style="padding: 10px; border-radius: 5px; border: none;">
+                    <textarea name="msg" placeholder="Type your message as the bot..." style="padding: 10px; height: 80px; border-radius: 5px; border: none;"></textarea>
+                    <button type="submit" style="background: #7289da; color: white; border: none; padding: 12px; border-radius: 5px; cursor: pointer; font-weight: bold;">SEND MESSAGE</button>
+                </form>
+            </div>
+            <div style="background: #2c2f33; padding: 20px; border-radius: 15px; border: 1px solid #43b581; width: 400px;">
+                <h3 style="color: #43b581; margin-top: 0;">📡 Recent Server Activity</h3>
+                <ul style="list-style: none; padding: 0; font-size: 0.9em;">
+                    {log_html if log_html else "<li>Waiting for new messages...</li>"}
+                </ul>
+            </div>
+        </body>
+    </html>
+    '''
+
+@app.route('/login', methods=['POST'])
+def login():
+    typed_pwd = request.form.get('pwd')
+    channel_id = request.form.get('channel_id')
+    msg = request.form.get('msg')
+    actual_pwd = os.getenv("DASHBOARD_PWD", "admin")
+
+    if typed_pwd != actual_pwd:
+        return "❌ Access Denied: Incorrect Password. <a href='/'>Back</a>"
+
+    try:
+        channel = bot.get_channel(int(channel_id))
+        if channel:
+            bot.loop.create_task(channel.send(msg))
+            return f"✅ Successfully sent to #{channel.name}! <a href='/'>Return to Dashboard</a>"
+        return "❌ Error: Bot cannot find that Channel ID. <a href='/'>Back</a>"
+    except Exception as e:
+        return f"❌ Connection Error: {e} <a href='/'>Back</a>"
 
 def run(): 
     app.run(host='0.0.0.0', port=8080)
@@ -146,6 +191,11 @@ async def on_ready():
 async def on_message(message):
     if message.author.bot or not message.guild: return
 
+    # Adding to Web Dashboard Logs
+    timestamp = datetime.datetime.now().strftime("%H:%M:%S")
+    recent_logs.insert(0, {"user": message.author.name, "content": message.content[:50], "time": timestamp})
+    if len(recent_logs) > 10: recent_logs.pop()
+
     # Word Filter
     if any(word.lower() in message.content.lower() for word in SWEAR_WORDS):
         await message.delete()
@@ -173,18 +223,13 @@ async def on_message(message):
 @bot.tree.command(name="purge", description="Delete a specified number of messages")
 @app_commands.checks.has_permissions(manage_messages=True)
 async def purge(interaction: discord.Interaction, amount: int):
-    if amount < 1 or amount > 100:
-        return await interaction.response.send_message("❌ Please choose a number between 1 and 100.", ephemeral=True)
-    
     await interaction.response.defer(ephemeral=True)
     try:
         deleted = await interaction.channel.purge(limit=amount)
         await interaction.followup.send(f"🧹 Successfully deleted {len(deleted)} messages.")
         send_to_webhook("🧹 Purge Executed", f"Moderator: {interaction.user.mention}\nAmount: {len(deleted)}\nChannel: {interaction.channel.mention}", discord.Color.blue())
-    except discord.Forbidden:
-        await interaction.followup.send("❌ I don't have permission to manage messages.")
-    except discord.HTTPException as e:
-        await interaction.followup.send(f"❌ Purge failed: {e}")
+    except Exception as e:
+        await interaction.followup.send(f"❌ Error: {e}")
 
 @bot.tree.command(name="warn", description="Issue a permanent warning")
 @app_commands.checks.has_permissions(manage_messages=True)
@@ -209,19 +254,15 @@ async def warn(interaction: discord.Interaction, member: discord.Member, reason:
 @bot.tree.command(name="warnings", description="View a member's warning history")
 async def warnings(interaction: discord.Interaction, member: discord.Member):
     if not supabase: return await interaction.response.send_message("❌ DB error.", ephemeral=True)
-    
     try:
         response = supabase.table("warnings").select("*").eq("user_id", str(member.id)).execute()
         user_warns = response.data
-
         if not user_warns:
             return await interaction.response.send_message(f"✅ {member.display_name} has a clean record.")
-
         embed = discord.Embed(title=f"Record: {member.display_name}", color=discord.Color.orange())
         for w in user_warns:
             date = w['created_at'].split("T")[0]
             embed.add_field(name=f"Date: {date}", value=f"Reason: {w['reason']}\nBy: {w['moderator']}", inline=False)
-        
         await interaction.response.send_message(embed=embed)
     except Exception as e:
         await interaction.response.send_message(f"❌ Error: {e}")
@@ -245,6 +286,12 @@ async def ban(interaction: discord.Interaction, member: discord.Member, reason: 
     await member.ban(reason=reason)
     await interaction.response.send_message(f"🔨 Banned {member.display_name}")
 
+@bot.tree.command(name="slowmode", description="Set channel slowmode")
+@app_commands.checks.has_permissions(manage_channels=True)
+async def slowmode(interaction: discord.Interaction, seconds: int):
+    await interaction.channel.edit(slowmode_delay=seconds)
+    await interaction.response.send_message(f"⏲️ Slowmode set to {seconds} seconds.")
+
 @bot.tree.command(name="setup_verify", description="Deploy the verification portal")
 @app_commands.checks.has_permissions(administrator=True)
 async def setup_verify(interaction: discord.Interaction):
@@ -258,11 +305,7 @@ async def sync(ctx):
     await bot.tree.sync()
     await ctx.send("🔄 Commands synced!")
 
-# ----- Execution -----
-
 if __name__ == "__main__":
     keep_alive()
     if TOKEN:
         bot.run(TOKEN)
-    else:
-        logger.error("❌ NO TOKEN FOUND")
