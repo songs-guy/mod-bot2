@@ -28,16 +28,20 @@ def home():
     # Creating the HTML Dashboard - Clean, ID-free, with Embed Presets
     log_html = "".join([f"<li style='margin-bottom:12px; border-left: 3px solid #5865F2; padding-left: 10px; background: #2f3136; padding: 10px; border-radius: 5px;'><b>{l['user']}:</b> {l['content']} <br><small style='color:#b9bbbe;'>🕒 {l['time']}</small></li>" for l in recent_logs])
     
-    # Generate Member Presets
-    members_string = "".join([f"<option value='{m.id}'>{m.name}</option>" for g in bot.guilds for m in g.members if not m.bot])
+    # Generate Member Presets - Added check for cache
+    members_string = "".join([f"<option value='{m.id}'>{m.name} {'(Offline)' if m.status == discord.Status.offline else ''}</option>" for g in bot.guilds for m in g.members if not m.bot])
 
     # Generate Channel Presets
     channels_string = "".join([f"<option value='{c.id}'>#{c.name}</option>" for g in bot.guilds for c in g.text_channels])
 
+    # Bot Status check
+    bot_status = "ONLINE" if bot.is_ready() else "CONNECTING..."
+    status_color = "#43b581" if bot.is_ready() else "#faa61a"
+
     return f'''
     <html>
         <head>
-            <title>ModBot Control Panel</title>
+            <title>LiveBot Control Panel</title>
             <style>
                 body {{ 
                     background-color: #0c0d0e; 
@@ -111,11 +115,25 @@ def home():
                 }}
                 button:hover {{ background: #4752c4; }}
                 button:active {{ transform: scale(0.98); }}
+                .sync-btn {{
+                    background: #4f545c;
+                    padding: 10px;
+                    font-size: 0.8em;
+                    margin-top: 20px;
+                }}
                 .clear-btn {{
                     background: #ed4245;
                     padding: 10px;
                     font-size: 0.8em;
                     margin-top: 10px;
+                }}
+                .status-indicator {{
+                    display: inline-block;
+                    width: 12px;
+                    height: 12px;
+                    background: {status_color};
+                    border-radius: 50%;
+                    margin-right: 8px;
                 }}
                 .embed-section {{ 
                     background: #2f3136;
@@ -135,7 +153,7 @@ def home():
                     color: #b9bbbe;
                     margin-top: 5px;
                 }}
-                h2 {{ font-size: 2.2em; margin-bottom: 40px; font-weight: 800; letter-spacing: -1px; }}
+                h2 {{ font-size: 2.2em; margin-bottom: 10px; font-weight: 800; letter-spacing: -1px; }}
                 h3 {{ font-size: 1.5em; margin-bottom: 25px; color: #5865F2; }}
                 .icon {{ font-style: normal; font-size: 1.2em; }}
                 .hidden {{ display: none !important; }}
@@ -160,7 +178,6 @@ def home():
                     const embedGroup = document.getElementById('group_embed');
                     const payloadLabel = document.getElementById('label_payload');
                     
-                    // Reset visibility
                     channelGroup.classList.add('hidden');
                     memberGroup.classList.add('hidden');
                     embedGroup.classList.add('hidden');
@@ -177,13 +194,12 @@ def home():
                         embedGroup.classList.remove('hidden');
                     }}
 
-                    // Contextual labeling for payload
                     if (action === "purge") {{
-                        payloadLabel.innerText = "Number of Messages to Clear";
+                        payloadLabel.innerHTML = '<i class="icon">🧹</i> Number of Messages';
                     }} else if (action === "kick" || action === "ban" || action === "warn") {{
-                        payloadLabel.innerText = "Reason for Action";
+                        payloadLabel.innerHTML = '<i class="icon">📜</i> Action Reason';
                     }} else {{
-                        payloadLabel.innerText = "Message Content Body";
+                        payloadLabel.innerHTML = '<i class="icon">📝</i> Message Body';
                     }}
                 }}
 
@@ -192,8 +208,16 @@ def home():
         </head>
         <body>
             <div class="card">
-                <h2 style="text-align:center; margin-top:0;">MODBOT PANEL</h2>
-                <form action="/execute" method="post">
+                <div style="text-align: right; margin-bottom: 20px;">
+                    <span class="status-indicator"></span>
+                    <span style="font-weight: bold; color: {status_color}; font-size: 0.8em;">{bot_status}</span>
+                </div>
+                <h2 style="text-align:center; margin-top:0;">LIVEBOT PANEL</h2>
+                <form action="/sync_data" method="post">
+                    <button type="submit" class="sync-btn">🔄 FORCE REFRESH MEMBERS & CHANNELS</button>
+                </form>
+                
+                <form action="/execute" method="post" style="margin-top: 20px;">
                     <label><i class="icon">🔒</i> Access Token</label>
                     <input type="password" name="pwd" placeholder="Enter Dashboard Password">
                     
@@ -258,6 +282,12 @@ def home():
         </body>
     </html>
     '''
+
+@app.route('/sync_data', methods=['POST'])
+def sync_data():
+    for guild in bot.guilds:
+        bot.loop.create_task(guild.chunk())
+    return "✅ Member Sync Requested. Please refresh this page in 5 seconds. <a href='/'>Back</a>"
 
 @app.route('/clear_logs', methods=['POST'])
 def clear_logs():
