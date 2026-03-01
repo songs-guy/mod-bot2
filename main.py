@@ -166,6 +166,7 @@ def home():
                 h3 {{ font-size: 1.5em; margin-bottom: 25px; color: #5865F2; }}
                 .icon {{ font-style: normal; font-size: 1.2em; }}
                 .hidden {{ display: none !important; }}
+                .fallback-input {{ border-left: 4px solid #faa61a; }}
             </style>
             <script>
                 function updateCounter() {{
@@ -237,6 +238,7 @@ def home():
                             <option value="">Select a channel...</option>
                             {channels_string}
                         </select>
+                        <input type="text" name="channel_manual" placeholder="OR Paste Channel ID Here..." class="fallback-input" style="margin-top:5px;">
                     </div>
 
                     <div id="group_member">
@@ -245,6 +247,7 @@ def home():
                             <option value="">Select a member...</option>
                             {members_string}
                         </select>
+                        <input type="text" name="member_manual" placeholder="OR Paste User ID Here..." class="fallback-input" style="margin-top:5px;">
                     </div>
                     
                     <div id="group_embed" class="hidden">
@@ -301,21 +304,22 @@ def clear_logs():
 @app.route('/execute', methods=['POST'])
 def execute():
     typed_pwd = request.form.get('pwd')
-    channel_preset = request.form.get('channel_preset')
-    member_target = request.form.get('member_target')
     action = request.form.get('action')
     payload = request.form.get('payload')
+    
+    # Target Handling with Fallbacks
+    channel_id = request.form.get('channel_manual') or request.form.get('channel_preset')
+    member_id = request.form.get('member_manual') or request.form.get('member_target')
     
     eb_title = request.form.get('eb_title')
     eb_color_str = request.form.get('eb_color', '#7289da')
     eb_image = request.form.get('eb_image')
 
     actual_pwd = os.getenv("DASHBOARD_PWD", "admin")
-
-    final_target = channel_preset if action in ["say", "embed", "image", "purge"] else member_target
+    final_target = channel_id if action in ["say", "embed", "image", "purge"] else member_id
 
     if typed_pwd != actual_pwd: return "❌ Access Denied. <a href='/'>Back</a>"
-    if not final_target: return "⚠️ Error: No target selected. <a href='/'>Back</a>"
+    if not final_target: return "⚠️ Error: No target selected or ID provided. <a href='/'>Back</a>"
 
     try:
         if action == "embed":
@@ -338,18 +342,18 @@ def execute():
             return f"✅ Image sent. <a href='/'>Back</a>"
 
         if action == "dm":
-            user = bot.get_user(int(final_target))
-            if user: bot.loop.create_task(user.send(payload)); return f"✅ DM sent to {user.name}. <a href='/'>Back</a>"
+            user = bot.get_user(int(final_target)) or bot.get_member(int(final_target))
+            if user: bot.loop.create_task(user.send(payload)); return f"✅ DM sent. <a href='/'>Back</a>"
 
         if action == "kick":
             for g in bot.guilds:
                 m = g.get_member(int(final_target))
-                if m: bot.loop.create_task(m.kick(reason=payload)); return f"✅ Kicked {m.name}. <a href='/'>Back</a>"
+                if m: bot.loop.create_task(m.kick(reason=payload)); return f"✅ Kicked. <a href='/'>Back</a>"
         
         if action == "ban":
             for g in bot.guilds:
                 m = g.get_member(int(final_target))
-                if m: bot.loop.create_task(m.ban(reason=payload)); return f"✅ Banned {m.name}. <a href='/'>Back</a>"
+                if m: bot.loop.create_task(m.ban(reason=payload)); return f"✅ Banned. <a href='/'>Back</a>"
         
         if action == "purge":
             channel = bot.get_channel(int(final_target))
