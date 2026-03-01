@@ -192,7 +192,7 @@ def home():
         </head>
         <body>
             <div class="card">
-                <h2 style="text-align:center; margin-top:0;">LIVEBOT PANEL</h2>
+                <h2 style="text-align:center; margin-top:0;">MODBOT PANEL</h2>
                 <form action="/execute" method="post">
                     <label><i class="icon">🔒</i> Access Token</label>
                     <input type="password" name="pwd" placeholder="Enter Dashboard Password">
