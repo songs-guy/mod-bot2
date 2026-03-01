@@ -125,6 +125,7 @@ def home():
                 }}
                 button:hover {{ background: #4752c4; }}
                 button:active {{ transform: scale(0.98); }}
+                button:disabled {{ background: #4f545c; cursor: not-allowed; transform: none; opacity: 0.6; }}
                 .sync-btn {{
                     background: #34373c;
                     padding: 12px;
@@ -180,6 +181,23 @@ def home():
                     counter.style.color = length > 2000 ? '#ed4245' : '#b9bbbe';
                 }}
 
+                function applyCooldown(buttonId, seconds) {{
+                    const btn = document.getElementById(buttonId);
+                    const originalText = btn.innerText;
+                    btn.disabled = true;
+                    let timeLeft = seconds;
+                    
+                    const interval = setInterval(() => {{
+                        timeLeft--;
+                        btn.innerText = "COOLDOWN (" + timeLeft + "s)";
+                        if (timeLeft <= 0) {{
+                            clearInterval(interval);
+                            btn.disabled = false;
+                            btn.innerText = originalText;
+                        }}
+                    }}, 1000);
+                }}
+
                 function toggleInputs() {{
                     const action = document.getElementById('action_select').value;
                     const channelGroup = document.getElementById('group_channel');
@@ -215,11 +233,11 @@ def home():
                 </div>
                 <h2 style="text-align:center; margin-top:0;">LIVEBOT PANEL</h2>
                 
-                <form action="/sync_data" method="post" style="text-align: center;">
-                    <button type="submit" class="sync-btn">🔄 FORCE SYNC (USE SPARINGLY)</button>
+                <form action="/sync_data" method="post" style="text-align: center;" onsubmit="applyCooldown('sync_btn_el', 30)">
+                    <button type="submit" id="sync_btn_el" class="sync-btn">🔄 FORCE SYNC (USE SPARINGLY)</button>
                 </form>
                 
-                <form action="/execute" method="post" style="margin-top: 20px;">
+                <form action="/execute" method="post" style="margin-top: 20px;" onsubmit="applyCooldown('exec_btn_el', 5)">
                     <label><i class="icon">🔒</i> Access Token</label>
                     <input type="password" name="pwd" placeholder="Enter Dashboard Password">
                     
@@ -270,7 +288,7 @@ def home():
                         <div class="char-counter" id="char_count">0 / 2000</div>
                     </div>
 
-                    <button type="submit">EXECUTE OPERATION</button>
+                    <button type="submit" id="exec_btn_el">EXECUTE OPERATION</button>
                 </form>
             </div>
 
